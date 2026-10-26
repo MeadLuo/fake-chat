@@ -1,0 +1,1451 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fake Chat</title>
+<script>
+  // Inside OBS (or with #overlay on the URL) this file is just the chat overlay
+  if (window.obsstudio || location.hash === '#overlay') document.documentElement.classList.add('overlay');
+</script>
+<style>
+  :root {
+    --bg: #111317; --panel: #1a1d23; --line: #2a2e36; --text: #e8e9ec; --dim: #8b909a;
+    --accent: #9b6bff; --good: #3ddc84; --bad: #ff5e5e;
+  }
+  html.overlay, html.overlay body { background: transparent !important; }
+  html.overlay #app { display: none; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 40px; display: grid; grid-template-columns: 1fr 400px; gap: 18px; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; } }
+  h1 { font-size: 20px; margin: 0 0 2px; }
+  .sub { color: var(--dim); font-size: 13px; margin-bottom: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 14px; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); margin: 0 0 12px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .card h3 { font-size: 13px; color: var(--dim); font-weight: 600; margin: 16px 0 8px; padding-top: 14px; border-top: 1px solid var(--line); }
+  button { font: inherit; border: 0; border-radius: 8px; padding: 10px 14px; cursor: pointer; background: #2a2e36; color: var(--text); }
+  button:hover { filter: brightness(1.15); }
+  button:disabled { opacity: .5; cursor: default; }
+  .big { width: 100%; padding: 16px; font-size: 17px; font-weight: 600; background: var(--accent); color: #fff; }
+  #mic.on, #screenBtn.on { background: var(--bad); color: #fff; }
+  #obsBtn { background: #4a3a8a; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row + .row { margin-top: 10px; }
+  textarea { flex: 1; font: inherit; font-size: 14px; background: #0d0f12; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; min-width: 0; resize: vertical; }
+  #memList { display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; padding-right: 4px; }
+  #memList:empty::after { content: "Nothing yet. Start streaming and chat will start remembering."; color: var(--dim); font-size: 13px; }
+  .mem { display: grid; grid-template-columns: 1fr 34px; gap: 6px; }
+  .mem input { padding: 7px 9px; font-size: 14px; }
+  .mem button { padding: 0; height: 34px; color: var(--dim); }
+  .mem button:hover { color: var(--bad); }
+  input[type=text], input[type=password], select { flex: 1; font: inherit; background: #0d0f12; color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; min-width: 0; }
+  label { color: var(--dim); font-size: 13px; width: 96px; flex-shrink: 0; }
+  input[type=range] { flex: 1; accent-color: var(--accent); min-width: 0; }
+  input[type=checkbox] { accent-color: var(--accent); width: 18px; height: 18px; flex-shrink: 0; }
+  input[type=color] { width: 34px; height: 34px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: none; cursor: pointer; flex-shrink: 0; }
+  input[type=color]::-webkit-color-swatch-wrapper { padding: 3px; }
+  input[type=color]::-webkit-color-swatch { border: 0; border-radius: 5px; }
+  .val { color: var(--dim); font-size: 13px; width: 40px; text-align: right; flex-shrink: 0; }
+  #heard { min-height: 48px; color: var(--dim); font-size: 14px; margin-top: 12px; }
+  #heard b { color: var(--text); font-weight: 500; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; text-transform: none; letter-spacing: 0; color: var(--dim); background: #0d0f12; border: 1px solid var(--line); border-radius: 99px; padding: 4px 10px; white-space: nowrap; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); flex-shrink: 0; }
+  .dot.good { background: var(--good); } .dot.bad { background: var(--bad); }
+  .err { color: var(--bad); font-size: 13px; margin-top: 8px; }
+  .err:empty { display: none; }
+  .help { color: var(--dim); font-size: 13px; }
+  .help p { margin: 6px 0; }
+  .help ol { margin: 6px 0; padding-left: 20px; }
+  .help li { margin: 4px 0; }
+  .hide { display: none !important; }
+  #preview { height: 560px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); position: relative;
+    background: repeating-conic-gradient(#3a3f4a 0 25%, #2c3038 0 50%) 0 0 / 22px 22px; }
+  #screenVid { width: 100%; border-radius: 8px; margin-top: 10px; border: 1px solid var(--line); }
+
+  #viewerList { max-height: 460px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 4px; }
+  .viewer { display: grid; grid-template-columns: 34px 1fr 92px 96px 34px; gap: 6px; align-items: center; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .viewer:last-child { border-bottom: 0; }
+  .viewer input[type=text], .viewer select { padding: 7px 9px; font-size: 14px; }
+  .viewer .vname { font-weight: 600; }
+  .viewer .vnote { grid-column: 2 / 5; color: var(--dim); }
+  .viewer .vnote:focus { color: var(--text); }
+  .viewer button { padding: 0; height: 34px; color: var(--dim); }
+  .viewer button:hover { color: var(--bad); }
+</style>
+</head>
+<body>
+<div id="app">
+<main>
+  <div>
+    <h1>Fake Chat</h1>
+    <div class="sub">Talk or type. AI viewers react, talk to each other and to you. Open this file in Chrome or Edge.</div>
+    <div id="framed" class="card hide" style="border-color:var(--bad)">
+      <b>You're viewing this inside a preview.</b>
+      <p class="help" style="margin:6px 0 0">Previews block the mic, screen sharing and popup windows. Download fake-chat.html, find it in your Downloads folder, and double click it so it opens in its own Chrome tab.</p>
+    </div>
+
+    <div class="card">
+      <button id="mic" class="big">Start listening</button>
+      <div id="heard">Nothing yet.</div>
+      <div id="micErr" class="err"></div>
+      <div class="row" style="margin-top:6px">
+        <input id="say" type="text" placeholder="Or type something and hit Enter">
+        <button id="send">Send</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Screen <span class="pill"><span id="screenDot" class="dot"></span><span id="screenLabel">Not sharing</span></span></h2>
+      <button id="screenBtn" style="width:100%">Share screen</button>
+      <video id="screenVid" class="hide" muted playsinline></video>
+      <div id="screenErr" class="err"></div>
+      <p class="help" style="margin:10px 0 0">Chat gets a snapshot of your screen every time it talks, so it reacts to your game even when you're quiet. Share just the game window if you can. Needs an AI provider.</p>
+    </div>
+
+    <div class="card">
+      <h2>Stream</h2>
+      <div class="row"><label for="streamer">Your name</label><input id="streamer" type="text" placeholder="what chat calls you"></div>
+      <div class="row"><label for="topic">Playing</label><input id="topic" type="text" placeholder="e.g. Minecraft hardcore, just chatting"></div>
+      <div class="row"><label for="vibe">Chat vibe</label><select id="vibe"></select></div>
+      <div class="row"><label for="speed">Busy-ness</label><input id="speed" type="range" min="1" max="5" step="1"><span id="speedVal" class="val"></span></div>
+      <div class="row"><label for="idle">Idle chat</label><input id="idle" type="checkbox"><span class="help">Chat keeps talking when you go quiet</span></div>
+      <div class="row"><label for="alerts">Fake alerts</label><input id="alerts" type="checkbox"><span class="help">Random subs, follows and raids every few minutes</span></div>
+      <div class="row" style="margin-top:14px">
+        <button id="clear">Clear chat</button>
+        <button id="testAlert">Send an alert now</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Chat memory <span id="memCount" class="pill">0</span></h2>
+      <div class="row" style="align-items:flex-start"><label for="about" style="padding-top:9px">About you</label>
+        <textarea id="about" rows="3" placeholder="Stuff your regulars would already know. e.g. I stream most nights, my cat always walks on my keyboard, I'm terrible at boss fights"></textarea>
+      </div>
+      <h3>What chat remembers</h3>
+      <p class="help" style="margin:0 0 10px">Chat picks up things you say and big moments as you stream, and brings them up later. Saved between streams. Edit or delete anything.</p>
+      <div id="memList"></div>
+      <div class="row" style="margin-top:10px">
+        <button id="addMem">Add memory</button>
+        <button id="clearMem">Forget everything</button>
+      </div>
+      <div class="row"><label for="learn">Learn</label><input id="learn" type="checkbox"><span class="help">Let chat add new memories as you stream</span></div>
+    </div>
+
+    <div class="card">
+      <h2>Viewers <span id="viewerCount" class="pill">0</span></h2>
+      <p class="help" style="margin:0 0 12px">Everyone has their own personality, badge and how much they talk. Click anything to change it. Edits save automatically.</p>
+      <div id="viewerList"></div>
+      <div class="row" style="margin-top:12px">
+        <button id="addViewer">Add viewer</button>
+        <button id="resetViewers">New random cast</button>
+      </div>
+      <div class="row"><label for="newViewers">New viewers</label><input id="newViewers" type="checkbox"><span class="help">Let the AI bring in extra people now and then</span></div>
+    </div>
+
+    <div class="card">
+      <h2>AI</h2>
+      <div class="row"><label for="provider">Provider</label>
+        <select id="provider">
+          <option value="none">None (offline, basic messages)</option>
+          <option value="anthropic">Claude</option>
+          <option value="openai">OpenAI or compatible</option>
+        </select>
+      </div>
+      <div class="row ai-only"><label for="apiKey">API key</label><input id="apiKey" type="password" placeholder="paste your key" autocomplete="off"></div>
+      <div class="row claude-only"><label for="brain">Brain</label>
+        <select id="brain">
+          <option value="fast">Fast (Haiku, cheapest)</option>
+          <option value="smart">Smart (Sonnet, recommended)</option>
+          <option value="genius">Genius (Opus, slower and pricier)</option>
+        </select>
+      </div>
+      <div class="row openai-only"><label for="model">Model</label><input id="model" type="text" list="models" placeholder="gpt-4o-mini"></div>
+      <datalist id="models">
+        <option value="gpt-4o-mini"></option>
+        <option value="gpt-4o"></option>
+      </datalist>
+      <div class="row openai-only"><label for="baseUrl">Base URL</label><input id="baseUrl" type="text" placeholder="https://api.openai.com/v1"></div>
+      <p class="help ai-only">Your key is saved in this browser only and sent straight to the AI company.</p>
+      <div id="aiErr" class="err"></div>
+    </div>
+
+    <div class="card">
+      <h2>Backup</h2>
+      <p class="help" style="margin:0 0 10px">Save your viewers, memory and settings to a file, or load them back. Handy for moving to another computer or browser. Your API key and OBS password are left out on purpose.</p>
+      <div class="row">
+        <button id="exportBtn">Export</button>
+        <button id="importBtn">Import</button>
+        <input id="importFile" type="file" accept=".json,application/json" class="hide">
+      </div>
+      <div id="backupMsg" class="help" style="margin-top:8px"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>Send to OBS <span class="pill"><span id="obsDot" class="dot"></span><span id="obsLabel">Not connected</span></span></h2>
+      <div class="help">
+        <ol style="margin-top:0">
+          <li>In OBS go to <b>Tools</b>, <b>WebSocket Server Settings</b>. Tick <b>Enable</b>. Click <b>Show Connect Info</b> and copy the password.</li>
+          <li>Add a <b>Browser</b> source. Tick <b>Local file</b> and pick this fake-chat.html. Set it to 400 x 700.</li>
+          <li>Paste the password below and hit Connect.</li>
+        </ol>
+      </div>
+      <div class="row"><label for="obsPass">Password</label><input id="obsPass" type="password" autocomplete="off" placeholder="from Show Connect Info"></div>
+      <div class="row"><label for="obsHost">Address</label><input id="obsHost" type="text" placeholder="127.0.0.1:4455"></div>
+      <div class="row" style="margin-top:12px"><button id="obsBtn" style="flex:1">Connect to OBS</button></div>
+      <div id="obsErr" class="err"></div>
+
+      <h3>Or the old way: window + green screen</h3>
+      <div class="row"><button id="openChat" style="flex:1">Open chat window</button>
+        <select id="bgColor" style="flex:0 0 130px">
+          <option value="#00ff00">Green</option>
+          <option value="#ff00ff">Pink</option>
+          <option value="#000000">Black</option>
+        </select>
+      </div>
+      <div id="popErr" class="err"></div>
+      <p class="help" style="margin:8px 0 0">Window Capture it in OBS and add a Chroma Key filter. See-through backgrounds won't work this way, use the Connect option for that.</p>
+    </div>
+
+    <div class="card">
+      <h2>Look</h2>
+      <div class="row"><label for="font">Font</label>
+        <select id="font"><option value="default">Default</option><option value="minecraft">Minecraft</option><option value="mono">Monospace</option><option value="rounded">Rounded</option></select>
+      </div>
+      <div class="row"><label for="nameStyle">Names</label>
+        <select id="nameStyle"><option value="colon">name: message</option><option value="mc">&lt;name&gt; message (Minecraft)</option></select>
+      </div>
+      <div class="row"><label for="size">Text size</label><input id="size" type="range" min="12" max="40" step="1"><span id="sizeVal" class="val"></span></div>
+      <div class="row"><label for="max">Lines shown</label><input id="max" type="range" min="4" max="30" step="1"><span id="maxVal" class="val"></span></div>
+      <div class="row"><label for="panelOpacity">Background</label><input id="panelColor" type="color"><input id="panelOpacity" type="range" min="0" max="100" step="1"><span id="panelOpacityVal" class="val"></span></div>
+      <div class="row"><label for="boxOpacity">Message boxes</label><input id="boxColor" type="color"><input id="boxOpacity" type="range" min="0" max="100" step="1"><span id="boxOpacityVal" class="val"></span></div>
+      <div class="row"><label for="fadeTop">Fade top</label><input id="fadeTop" type="checkbox"><span class="help">Older messages melt away at the top</span></div>
+      <div class="row"><label for="fade">Remove after</label>
+        <select id="fade"><option value="0">Never</option><option value="15">15 sec</option><option value="30">30 sec</option><option value="60">60 sec</option><option value="120">2 min</option></select>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Preview <span class="pill"><span id="aiDot" class="dot"></span><span id="aiLabel">Offline</span></span></h2>
+      <div id="preview"><div id="previewChat" class="chat"></div></div>
+      <p class="help" style="margin:8px 0 0">The checkers show what will be see-through on stream.</p>
+    </div>
+
+    <div class="card">
+      <h2>Voices</h2>
+      <div class="row"><label for="tts">Read aloud</label><input id="tts" type="checkbox"><span class="help">Each viewer gets their own voice</span></div>
+      <div class="row"><label for="ttsVol">Volume</label><input id="ttsVol" type="range" min="0" max="100" step="1"><span id="ttsVolVal" class="val"></span></div>
+      <p class="help" style="margin:8px 0 0">Wear headphones so the mic doesn't hear chat. The mic also ignores you while a voice is talking.</p>
+    </div>
+  </div>
+</main>
+</div>
+
+<script>
+// ====================================================================
+// Shared bits (used by the control page and the OBS overlay)
+// ====================================================================
+const CHAT_CSS = `
+  .chat { position: absolute; inset: 0; padding: 14px; display: flex; flex-direction: column; justify-content: flex-end; gap: 6px; overflow: hidden;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: var(--size, 20px); color: #fff;
+    background: var(--panel, transparent); border-radius: 12px; }
+  .chat.fadetop { -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 45%); mask-image: linear-gradient(to bottom, transparent 0%, #000 45%); }
+  .chat .m { line-height: 1.35; overflow-wrap: anywhere; text-shadow: 0 1px 2px rgba(0,0,0,.9), 0 0 4px rgba(0,0,0,.6); animation: pop .25s ease-out; transition: opacity .6s; flex-shrink: 0; }
+  .chat.boxed .m { background: var(--box); padding: .3em .6em; border-radius: .5em; align-self: flex-start; max-width: 100%; }
+  .chat .u { font-weight: 700; }
+  .chat .b { margin-right: .25em; font-size: .85em; }
+  .chat .at { font-weight: 700; }
+  .chat .m.hl { border-left: 3px solid #b48cff; padding-left: .5em; }
+  .chat .m.alert { background: linear-gradient(90deg, #5b2fd1, #9b6bff); font-weight: 700; padding: .45em .75em; border-radius: .5em; align-self: flex-start; text-shadow: none; }
+  .chat .m.out { opacity: 0; }
+  .chat.f-minecraft { font-family: "Monocraft", ui-monospace, monospace; -webkit-font-smoothing: none; }
+  .chat.f-minecraft .m { text-shadow: .1em .1em 0 rgba(0,0,0,.8); line-height: 1.3; }
+  .chat.f-minecraft .u { font-weight: 400; }
+  .chat.f-minecraft.boxed .m, .chat.f-minecraft .m.alert { border-radius: 0; }
+  .chat.f-mono { font-family: ui-monospace, Consolas, "Courier New", monospace; }
+  .chat.f-rounded { font-family: "Arial Rounded MT Bold", "Nunito", "Varela Round", ui-rounded, system-ui, sans-serif; }
+  @font-face { font-family: "Monocraft"; font-weight: 400; src: url(data:font/woff2;base64,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) format("woff2"); }
+  @font-face { font-family: "Monocraft"; font-weight: 700; src: url(data:font/woff2;base64,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) format("woff2"); }
+  @keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }`;
+
+const BADGES = { sub: '⭐', vip: '💎', mod: '🛡️' };
+const DEFAULT_STYLE = { font: 'default', nameStyle: 'colon', size: 20, max: 15, panelColor: '#000000', panelOpacity: 0, boxColor: '#000000', boxOpacity: 0, fadeTop: false, fade: 0, bgColor: '#00ff00' };
+
+function hexToRgba(hex, a) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || '');
+  const n = m ? parseInt(m[1], 16) : 0;
+  return `rgba(${n >> 16 & 255}, ${n >> 8 & 255}, ${n & 255}, ${a})`;
+}
+
+// Draws chat into a container. Works in this page, the popup, or inside OBS.
+function makeRenderer(box, timer = (fn, ms) => setTimeout(fn, ms)) {
+  let st = { ...DEFAULT_STYLE };
+  const doc = box.ownerDocument;
+  const prune = () => { while (box.children.length > st.max) box.firstElementChild.remove(); };
+  return {
+    add(m) {
+      const el = doc.createElement('div');
+      if (m.kind === 'alert') {
+        el.className = 'm alert';
+        el.textContent = m.msg;
+      } else {
+        el.className = 'm' + (m.hl ? ' hl' : '');
+        if (BADGES[m.badge]) { const b = doc.createElement('span'); b.className = 'b'; b.textContent = BADGES[m.badge]; el.append(b); }
+        const u = doc.createElement('span');
+        u.className = 'u'; u.dataset.user = m.user; u.style.color = m.color; u.textContent = m.user;
+        if (st.nameStyle === 'mc') el.append(doc.createTextNode('<'), u, doc.createTextNode('> '));
+        else el.append(u, doc.createTextNode(': '));
+        for (const part of String(m.msg).split(/(@[A-Za-z0-9_]+)/)) {
+          if (!part) continue;
+          if (part[0] === '@') { const a = doc.createElement('span'); a.className = 'at'; a.textContent = part; el.append(a); }
+          else el.append(doc.createTextNode(part));
+        }
+      }
+      box.append(el);
+      prune();
+      if (st.fade > 0) timer(() => { el.classList.add('out'); timer(() => el.remove(), 700); }, st.fade * 1000);
+    },
+    clear() { box.innerHTML = ''; },
+    rename(oldName, newName, color) {
+      for (const u of box.querySelectorAll('.u')) {
+        if (u.dataset.user !== oldName) continue;
+        u.dataset.user = newName; u.textContent = newName; u.style.color = color;
+      }
+    },
+    style(s) {
+      st = { ...DEFAULT_STYLE, ...s };
+      box.style.setProperty('--size', st.size + 'px');
+      box.style.setProperty('--panel', hexToRgba(st.panelColor, st.panelOpacity / 100));
+      box.style.setProperty('--box', hexToRgba(st.boxColor, st.boxOpacity / 100));
+      box.classList.toggle('boxed', st.boxOpacity > 0);
+      box.classList.toggle('fadetop', !!st.fadeTop);
+      for (const f of ['minecraft', 'mono', 'rounded']) box.classList.toggle('f-' + f, st.font === f);
+      prune();
+    },
+  };
+}
+function applyEvent(r, ev) {
+  if (typeof ev === 'string') { try { ev = JSON.parse(ev); } catch { return; } }
+  if (!ev || !r) return;
+  if (ev.type === 'chat') r.add(ev.m);
+  else if (ev.type === 'style') r.style(ev.style);
+  else if (ev.type === 'clear') r.clear();
+  else if (ev.type === 'rename') r.rename(ev.old, ev.new, ev.color);
+}
+
+if (document.documentElement.classList.contains('overlay')) runOverlay();
+else runControl();
+
+// ====================================================================
+// OBS overlay: just the chat, see-through, fed by the control page
+// ====================================================================
+function runOverlay() {
+  const css = document.createElement('style');
+  css.textContent = `html,body{margin:0;height:100%;overflow:hidden}${CHAT_CSS}`;
+  document.head.append(css);
+  const box = document.createElement('div');
+  box.className = 'chat';
+  document.body.append(box);
+  const r = makeRenderer(box);
+  r.style(DEFAULT_STYLE);
+  // Sent through OBS's WebSocket server by the control page
+  window.addEventListener('fakechat', e => applyEvent(r, e.detail));
+}
+
+// ====================================================================
+// Control page
+// ====================================================================
+function runControl() {
+const $ = id => document.getElementById(id);
+const chatCss = document.createElement('style');
+chatCss.textContent = CHAT_CSS;
+document.head.append(chatCss);
+let inFrame = false;
+try { inFrame = window.self !== window.top; } catch { inFrame = true; }
+if (inFrame) $('framed').classList.remove('hide');
+
+// ---------- settings ----------
+const DEFAULTS = {
+  streamer: '', topic: '', vibe: 'hype', speed: 3, idle: true, alerts: true, newViewers: false,
+  about: '', learn: true,
+  provider: 'none', apiKey: '', brain: 'smart', model: '', baseUrl: '',
+  obsHost: '', obsPass: '',
+  bgColor: '#00ff00', font: 'default', nameStyle: 'colon', size: 20, max: 15, panelColor: '#000000', panelOpacity: 0, boxColor: '#000000', boxOpacity: 0, fadeTop: false, fade: 0,
+  tts: false, ttsVol: 80,
+};
+const BRAINS = { fast: 'claude-haiku-5-5', smart: 'claude-sonnet-5-5', genius: 'claude-opus-5-5' };
+let S = { ...DEFAULTS };
+try {
+  const saved = JSON.parse(localStorage.getItem('fakechat-html') || '{}');
+  if (saved.boxed && saved.boxOpacity === undefined) saved.boxOpacity = 60; // older version had an on/off switch
+  if (String(saved.model || '').startsWith('claude')) delete saved.model; // Claude now uses the Brain picker
+  Object.assign(S, saved);
+} catch {}
+function modelName() {
+  if (S.provider === 'anthropic') return BRAINS[S.brain] || BRAINS.smart;
+  return S.model || 'gpt-4o-mini';
+}
+
+const VIBES = {
+  hype: 'high energy, caps, emotes and hype, very supportive',
+  chill: 'relaxed and friendly, mostly lowercase, cozy small-stream energy',
+  wholesome: 'kind and encouraging, compliments, asks nice questions',
+  roast: 'playful teasing and banter, never mean-spirited or personal',
+  chaos: 'unhinged meme chat, random jokes, emote spam, but still reacting',
+};
+$('vibe').innerHTML = Object.keys(VIBES).map(v => `<option value="${v}">${v}</option>`).join('');
+
+const FIELDS = Object.keys(DEFAULTS);
+const NUMERIC = new Set(['speed', 'size', 'max', 'panelOpacity', 'boxOpacity', 'fade', 'ttsVol']);
+function loadForm() {
+  for (const k of FIELDS) {
+    const el = $(k); if (!el) continue;
+    if (el.type === 'checkbox') el.checked = !!S[k]; else el.value = S[k];
+  }
+  refreshUi();
+}
+function readForm() {
+  for (const k of FIELDS) {
+    const el = $(k); if (!el) continue;
+    if (el.type === 'checkbox') S[k] = el.checked;
+    else if (NUMERIC.has(k)) S[k] = Number(el.value);
+    else S[k] = el.value.trim();
+  }
+  try { localStorage.setItem('fakechat-html', JSON.stringify(S)); } catch {}
+  refreshUi();
+  out({ type: 'style', style: chatStyle() });
+}
+function refreshUi() {
+  $('speedVal').textContent = $('speed').value;
+  $('sizeVal').textContent = $('size').value + 'px';
+  $('maxVal').textContent = $('max').value;
+  $('panelOpacityVal').textContent = $('panelOpacity').value + '%';
+  $('boxOpacityVal').textContent = $('boxOpacity').value + '%';
+  $('ttsVolVal').textContent = $('ttsVol').value + '%';
+  const p = $('provider').value;
+  document.querySelectorAll('.ai-only').forEach(e => e.classList.toggle('hide', p === 'none'));
+  document.querySelectorAll('.openai-only').forEach(e => e.classList.toggle('hide', p !== 'openai'));
+  document.querySelectorAll('.claude-only').forEach(e => e.classList.toggle('hide', p !== 'anthropic'));
+  const ready = aiReady();
+  $('aiLabel').textContent = ready ? 'AI: ' + modelName() : 'Offline';
+  $('aiDot').className = 'dot ' + (ready ? 'good' : '');
+}
+for (const k of FIELDS) {
+  const el = $(k); if (!el) continue;
+  const live = ['text', 'password', 'range', 'color', 'textarea'].includes(el.type);
+  el.addEventListener(live ? 'input' : 'change', readForm);
+}
+
+function aiReady() {
+  if (S.provider === 'anthropic') return !!S.apiKey;
+  if (S.provider === 'openai') return !!(S.apiKey || (S.baseUrl && !S.baseUrl.includes('api.openai.com')));
+  return false;
+}
+function chatStyle() {
+  const { font, nameStyle, size, max, panelColor, panelOpacity, boxColor, boxOpacity, fadeTop, fade, bgColor } = S;
+  return { font, nameStyle, size, max, panelColor, panelOpacity, boxColor, boxOpacity, fadeTop, fade, bgColor };
+}
+
+// Timers that keep running when this tab is in the background.
+// Chrome heavily slows normal timers in hidden tabs, but not inside a worker.
+const later = (() => {
+  try {
+    const src = 'onmessage = e => setTimeout(() => postMessage(e.data.id), e.data.ms)';
+    const w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    const waiting = new Map();
+    let n = 0;
+    w.onmessage = e => { const fn = waiting.get(e.data); waiting.delete(e.data); if (fn) fn(); };
+    return (fn, ms) => { waiting.set(++n, fn); w.postMessage({ id: n, ms }); };
+  } catch {
+    return (fn, ms) => setTimeout(fn, ms);
+  }
+})();
+
+// ---------- where chat goes: preview, popup window, OBS ----------
+const previewR = makeRenderer($('previewChat'), later);
+let popup = null, popupR = null;
+
+function out(ev) {
+  applyEvent(previewR, ev);
+  try {
+    if (popup && !popup.closed && popupR) {
+      applyEvent(popupR, ev);
+      if (ev.type === 'style') popup.document.body.style.background = ev.style.bgColor;
+    }
+  } catch {}
+  obs.send(ev);
+}
+
+$('openChat').onclick = () => {
+  $('popErr').textContent = '';
+  try { if (popup && !popup.closed) { popup.focus(); return; } } catch {}
+  try {
+    popup = window.open('', 'fakechat-obs', 'popup,width=420,height=700');
+    if (!popup) throw new Error('blocked');
+    popup.document.open();
+    popup.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Fake Chat (OBS)</title><style>html,body{margin:0;height:100%;overflow:hidden}${CHAT_CSS}</style></head><body><div class="chat"></div></body><!--
+The "Minecraft" font option uses Monocraft (https://github.com/IdreesInc/Monocraft),
+trimmed to basic Latin characters and embedded above. Its licence follows.
+
+Copyright (c) 2022, Idrees Hassan (https://github.com/IdreesInc/Monocraft)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+
+- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of academic and linguistic communities, and to provide a free and
+open framework in which fonts may be shared and improved in partnership
+with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and
+redistributed freely as long as they are not sold by themselves. The
+fonts, including any derivative works, can be bundled, embedded,
+redistributed and/or sold with any software provided that any reserved
+names are not used by derivative works. The fonts and derivatives,
+however, cannot be released under any other type of license. The
+requirement for fonts to remain under this license does not apply
+to any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright
+Holder(s) under this license and clearly marked as such. This may
+include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the
+copyright statement(s).
+
+"Original Version" refers to the collection of Font Software components as
+distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to, deleting,
+or substituting - - in part or in whole - - any of the components of the
+Original Version, by changing formats or by porting the Font Software to a
+new environment.
+
+"Author" refers to any designer, engineer, programmer, technical
+writer or other person who contributed to the Font Software.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed, modify,
+redistribute, and sell modified and unmodified copies of the Font
+Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components,
+in Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+redistributed and/or sold with any software, provided that each copy
+contains the above copyright notice and this license. These can be
+included either as stand-alone text files, human-readable headers or
+in the appropriate machine-readable metadata fields within text or
+binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+Name(s) unless explicit written permission is granted by the corresponding
+Copyright Holder. This restriction only applies to the primary font name as
+presented to the users.
+
+4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+Software shall not be used to promote, endorse or advertise any
+Modified Version, except to acknowledge the contribution(s) of the
+Copyright Holder(s) and the Author(s) or with their explicit written
+permission.
+
+5) The Font Software, modified or unmodified, in part or in whole,
+must be distributed entirely under this license, and must not be
+distributed under any other license. The requirement for fonts to
+remain under this license does not apply to any document created
+using the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+OTHER DEALINGS IN THE FONT SOFTWARE.
+
+-->
+</html>`);
+    popup.document.close();
+    const box = popup.document.querySelector('.chat');
+    popupR = makeRenderer(box, later);
+    for (const el of $('previewChat').children) box.append(popup.document.importNode(el, true));
+    popupR.style(chatStyle());
+    popup.document.body.style.background = S.bgColor;
+  } catch {
+    popup = popupR = null;
+    $('popErr').textContent = inFrame
+      ? "Can't open windows from a preview. Open the file straight in Chrome."
+      : 'Popup was blocked. Click the blocked popup icon at the right of the address bar, choose Always allow, then try again.';
+  }
+};
+
+// ---------- OBS WebSocket link (built into OBS 28 and newer) ----------
+const obs = (() => {
+  let ws = null, want = false, ready = false, reqId = 0, lastStyle = 0;
+  const status = (text, cls = '') => { $('obsLabel').textContent = text; $('obsDot').className = 'dot ' + cls; };
+  async function sha256b64(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return btoa(String.fromCharCode(...new Uint8Array(buf)));
+  }
+  function connect() {
+    want = true;
+    $('obsErr').textContent = '';
+    $('obsBtn').textContent = 'Disconnect';
+    try { if (ws) { ws.onclose = null; ws.close(); } } catch {}
+    status('Connecting...');
+    try { ws = new WebSocket('ws://' + (S.obsHost || '127.0.0.1:4455').replace(/^wss?:\/\//, ''), 'obswebsocket.json'); }
+    catch { status('Bad address', 'bad'); want = false; $('obsBtn').textContent = 'Connect to OBS'; return; }
+    ws.onmessage = async e => {
+      let msg; try { msg = JSON.parse(e.data); } catch { return; }
+      if (msg.op === 0) { // Hello
+        const d = { rpcVersion: 1, eventSubscriptions: 0 };
+        const a = msg.d.authentication;
+        if (a) {
+          if (!S.obsPass) { want = false; $('obsErr').textContent = 'OBS wants a password. Copy it from Show Connect Info.'; ws.close(); return; }
+          d.authentication = await sha256b64(await sha256b64(S.obsPass + a.salt) + a.challenge);
+        }
+        ws.send(JSON.stringify({ op: 1, d }));
+      } else if (msg.op === 2) { // Identified
+        ready = true;
+        status('Connected to OBS', 'good');
+        send({ type: 'style', style: chatStyle() });
+      } else if (msg.op === 7) { // request result
+        const r = msg.d.requestStatus;
+        if (r && !r.result) $('obsErr').textContent = 'OBS said: ' + (r.comment || 'error ' + r.code) + '. Make sure you added a Browser source.';
+      }
+    };
+    ws.onclose = e => {
+      ready = false;
+      if (e.code === 4009) { want = false; $('obsErr').textContent = 'Wrong password. Copy it again from Show Connect Info in OBS.'; }
+      if (want) { status('Not connected, retrying...', 'bad'); later(() => { if (want && !ready) connect(); }, 3000); }
+      else { status('Not connected'); $('obsBtn').textContent = 'Connect to OBS'; }
+      if (want && e.code === 1006 && !$('obsErr').textContent)
+        $('obsErr').textContent = "Can't reach OBS. Is it open, and is Enable ticked in WebSocket Server Settings?";
+    };
+  }
+  function disconnect() {
+    want = false;
+    try { if (ws) ws.close(); } catch {}
+    status('Not connected');
+    $('obsBtn').textContent = 'Connect to OBS';
+  }
+  function send(ev) {
+    if (!ready || ws.readyState !== 1) return;
+    if (ev.type === 'style') lastStyle = Date.now();
+    ws.send(JSON.stringify({ op: 6, d: {
+      requestType: 'CallVendorRequest', requestId: String(++reqId),
+      requestData: { vendorName: 'obs-browser', requestType: 'emit_event', requestData: { event_name: 'fakechat', event_data: ev } },
+    } }));
+  }
+  // Re-send the look now and then, in case the OBS source was reloaded
+  (function keepStyle() { later(keepStyle, 4000); if (ready && Date.now() - lastStyle > 4000) send({ type: 'style', style: chatStyle() }); })();
+  return { connect, disconnect, send, get want() { return want; } };
+})();
+$('obsBtn').onclick = () => obs.want ? obs.disconnect() : obs.connect();
+
+// ---------- viewers ----------
+const NAME_A = ['pixel', 'noodle', 'frost', 'turbo', 'lazy', 'salty', 'cosmic', 'kiwi', 'pog', 'sleepy', 'neon', 'chunky', 'spicy', 'silent', 'retro', 'mega', 'tiny', 'shadow', 'crispy', 'lofi', 'grumpy', 'zesty'];
+const NAME_B = ['goose', 'fox', 'gamer', 'wizard', 'bean', 'toast', 'panda', 'ninja', 'potato', 'moth', 'gremlin', 'dragon', 'muffin', 'tuna', 'yeti', 'pigeon', 'koala', 'biscuit', 'otter', 'raccoon', 'nugget', 'frog'];
+// No greens, so a green screen key doesn't eat usernames
+const COLORS = ['#FF4A4A', '#4AA3FF', '#FFB020', '#C77DFF', '#FF7AC6', '#FF8A3D', '#7C9CFF', '#FFD84A', '#FF5E8A', '#B388FF', '#FFFFFF', '#FF9E80'];
+const PERSONALITIES = [
+  'backseat gamer, always says what the streamer should have done',
+  'hype man, caps lock, gets excited about everything',
+  'shy lurker, barely talks, short lowercase messages',
+  'friendly troll, teases the streamer but clearly loves the stream',
+  'curious, asks loads of questions about the game and the streamer',
+  'emote spammer, mostly reacts with emotes and one-word messages',
+  'wholesome supporter, kind, reminds people to drink water',
+  'know-it-all who quotes stats and facts, sometimes confidently wrong',
+  'first time here, a bit lost, asks what is going on',
+  'types fast and makes typos, never fixes them',
+  'meme lord, everything is a meme reference',
+  'up way too late, keeps saying they should sleep but never leaves',
+  'competitive, says they could do it better',
+  'theorist who overthinks everything and makes predictions',
+  'always hungry, talks about snacks',
+  'day one regular, calls the streamer by a nickname, has inside jokes',
+  'dramatic, overreacts to absolutely everything',
+  'deadpan, dry one-line jokes',
+  'sweet older viewer, full sentences and proper punctuation',
+  'pun enjoyer, makes terrible puns',
+  'gives unsolicited life advice',
+  'yells CLIP IT whenever anything happens',
+  'compares everything to other games',
+  'chaotic gremlin, random thoughts out of nowhere',
+  'student who should be doing homework right now',
+  'music nerd, asks what song is playing',
+  'kiwi who uses slang like chur, sweet as, yeah nah',
+  'conspiracy joker, thinks the game is rigged against the streamer',
+  'helpful, gives actual tips and is usually right',
+  'only speaks to other chatters, gossips about chat',
+];
+const ACTIVITY = { 1: 'lurker', 2: 'normal', 3: 'chatty' };
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const cap = s => s[0].toUpperCase() + s.slice(1);
+function hash(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) >>> 0; return h; }
+function makeName() {
+  const a = pick(NAME_A), b = pick(NAME_B);
+  const n = Math.random() < 0.5 ? String(Math.floor(Math.random() * 999)) : '';
+  return pick([a + b + n, a + '_' + b, cap(a) + cap(b) + n, b + (n || '42'), 'xX' + a + b + 'Xx', a + b + '_tv', 'the' + cap(b) + n]);
+}
+const cleanName = n => String(n || '').replace(/^@/, '').replace(/[^A-Za-z0-9_]/g, '').slice(0, 25);
+function randomBadge(mods) { const r = Math.random(); return r < .06 && mods < 2 ? 'mod' : r < .14 ? 'vip' : r < .4 ? 'sub' : ''; }
+function randomViewer(name, used = new Set(), mods = 0) {
+  const free = PERSONALITIES.filter(p => !used.has(p));
+  const note = pick(free.length ? free : PERSONALITIES);
+  used.add(note);
+  const chat = note.startsWith('shy') ? 1 : Math.random() < .25 ? 1 : Math.random() < .35 ? 3 : 2;
+  return { color: COLORS[hash(name) % COLORS.length], note, badge: randomBadge(mods), chat };
+}
+
+let viewers = new Map(); // name -> { color, note, badge, chat }
+function saveViewers() {
+  try { localStorage.setItem('fakechat-viewers', JSON.stringify([...viewers])); } catch {}
+  $('viewerCount').textContent = viewers.size;
+}
+function randomCast(n = 18) {
+  viewers = new Map();
+  const used = new Set();
+  let mods = 0;
+  while (viewers.size < n) {
+    const name = makeName();
+    if (viewers.has(name)) continue;
+    const v = randomViewer(name, used, mods);
+    if (v.badge === 'mod') mods++;
+    viewers.set(name, v);
+  }
+}
+try {
+  const saved = JSON.parse(localStorage.getItem('fakechat-viewers') || 'null');
+  if (Array.isArray(saved) && saved.length) {
+    const used = new Set();
+    // older saves had no personality / badge / activity, so fill those in
+    viewers = new Map(saved.map(([n, v]) => [n, { ...randomViewer(n, used), ...v, note: v.note || randomViewer(n, used).note, chat: v.chat || 2, badge: v.badge || '' }]));
+  }
+} catch {}
+if (!viewers.size) randomCast();
+
+// Picks someone at random, chatty people more often
+function pickViewer() {
+  const list = [...viewers];
+  let total = 0;
+  for (const [, v] of list) total += v.chat * v.chat;
+  let r = Math.random() * total;
+  for (const [n, v] of list) { r -= v.chat * v.chat; if (r <= 0) return n; }
+  return list[0][0];
+}
+// Who is this message from? Unknown names become new viewers only if allowed.
+function viewerFor(name) {
+  name = cleanName(name);
+  if (name && viewers.has(name)) return name;
+  if (name) { // AI sometimes changes case
+    const lower = name.toLowerCase();
+    for (const n of viewers.keys()) if (n.toLowerCase() === lower) return n;
+  }
+  if (name && S.newViewers && viewers.size < 200) {
+    viewers.set(name, { ...randomViewer(name), badge: '', note: 'new here, just found the stream' });
+    saveViewers();
+    drawViewers();
+    return name;
+  }
+  return pickViewer();
+}
+
+function drawViewers() {
+  const list = $('viewerList');
+  list.innerHTML = '';
+  for (const [name, v] of viewers) {
+    const row = document.createElement('div');
+    row.className = 'viewer';
+    row.innerHTML = `<input type="color" title="Name colour"><input type="text" class="vname" title="Username" spellcheck="false">
+      <select title="Badge"><option value="">no badge</option><option value="sub">⭐ sub</option><option value="vip">💎 vip</option><option value="mod">🛡️ mod</option></select>
+      <select title="How much they talk"><option value="1">lurker</option><option value="2">normal</option><option value="3">chatty</option></select>
+      <button title="Remove">✕</button>
+      <input type="text" class="vnote" placeholder="personality: how they act and type" title="Personality">`;
+    const [color, nameIn, noteIn] = row.querySelectorAll('input');
+    const [badgeSel, chatSel] = row.querySelectorAll('select');
+    color.value = v.color; nameIn.value = name; nameIn.style.color = v.color; noteIn.value = v.note || '';
+    badgeSel.value = v.badge || ''; chatSel.value = String(v.chat || 2);
+    let current = name;
+    color.oninput = () => {
+      viewers.get(current).color = color.value;
+      nameIn.style.color = color.value;
+      out({ type: 'rename', old: current, new: current, color: color.value });
+      saveViewers();
+    };
+    nameIn.onchange = () => {
+      const next = cleanName(nameIn.value);
+      if (!next || (next !== current && viewers.has(next))) { nameIn.value = current; return; }
+      viewers = new Map([...viewers].map(([k, val]) => [k === current ? next : k, val]));
+      out({ type: 'rename', old: current, new: next, color: viewers.get(next).color });
+      current = next; nameIn.value = next;
+      saveViewers();
+    };
+    nameIn.onkeydown = e => { if (e.key === 'Enter') nameIn.blur(); };
+    noteIn.onchange = () => { viewers.get(current).note = noteIn.value.trim().slice(0, 160); saveViewers(); };
+    badgeSel.onchange = () => { viewers.get(current).badge = badgeSel.value; saveViewers(); };
+    chatSel.onchange = () => { viewers.get(current).chat = Number(chatSel.value); saveViewers(); };
+    row.querySelector('button').onclick = () => {
+      if (viewers.size <= 1) return;
+      viewers.delete(current);
+      saveViewers();
+      row.remove();
+    };
+    list.append(row);
+  }
+  saveViewers();
+}
+$('addViewer').onclick = () => {
+  let name = makeName();
+  while (viewers.has(name)) name = makeName();
+  viewers.set(name, randomViewer(name, new Set([...viewers.values()].map(v => v.note))));
+  drawViewers();
+  const inputs = $('viewerList').querySelectorAll('.vname');
+  const last = inputs[inputs.length - 1];
+  last.scrollIntoView({ block: 'nearest' }); last.focus(); last.select();
+};
+$('resetViewers').onclick = () => {
+  if (!confirm('Replace everyone with a new random cast? Your edits will be lost.')) return;
+  randomCast(); drawViewers();
+};
+
+// ---------- chat memory ----------
+let memory = []; // [{ t: text }]
+try { const m = JSON.parse(localStorage.getItem('fakechat-memory') || '[]'); if (Array.isArray(m)) memory = m.filter(x => x && x.t); } catch {}
+function saveMemory() {
+  try { localStorage.setItem('fakechat-memory', JSON.stringify(memory)); } catch {}
+  $('memCount').textContent = memory.length;
+}
+function drawMemory() {
+  const list = $('memList');
+  list.innerHTML = '';
+  memory.forEach(item => {
+    const row = document.createElement('div');
+    row.className = 'mem';
+    row.innerHTML = '<input type="text"><button title="Forget">✕</button>';
+    const input = row.querySelector('input');
+    input.value = item.t;
+    input.onchange = () => { const t = input.value.trim(); if (t) item.t = t.slice(0, 200); else memory = memory.filter(x => x !== item); saveMemory(); };
+    row.querySelector('button').onclick = () => { memory = memory.filter(x => x !== item); saveMemory(); row.remove(); };
+    list.append(row);
+  });
+  saveMemory();
+}
+function remember(notes) {
+  if (!S.learn || !Array.isArray(notes)) return;
+  let added = false;
+  for (let t of notes) {
+    t = String(t || '').trim().slice(0, 200);
+    if (t.length < 4) continue;
+    const key = t.toLowerCase().replace(/[^a-z0-9 ]/g, '');
+    if (memory.some(x => x.t.toLowerCase().replace(/[^a-z0-9 ]/g, '') === key)) continue;
+    memory.push({ t });
+    added = true;
+  }
+  while (memory.length > 40) memory.shift(); // oldest falls off
+  if (added) drawMemory();
+}
+$('addMem').onclick = () => {
+  memory.push({ t: 'new memory' });
+  drawMemory();
+  const inputs = $('memList').querySelectorAll('input');
+  const last = inputs[inputs.length - 1];
+  last.focus(); last.select();
+};
+$('clearMem').onclick = () => {
+  if (!confirm('Make chat forget everything it remembers?')) return;
+  memory = []; drawMemory();
+};
+
+// ---------- backup ----------
+const SECRET = ['apiKey', 'obsPass'];
+$('exportBtn').onclick = () => {
+  const settings = { ...S };
+  for (const k of SECRET) delete settings[k];
+  const data = { app: 'fake-chat', version: 1, settings, viewers: [...viewers], memory };
+  const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = 'fake-chat-backup.json';
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+  $('backupMsg').textContent = 'Saved fake-chat-backup.json to your Downloads.';
+};
+$('importBtn').onclick = () => $('importFile').click();
+$('importFile').onchange = async () => {
+  const file = $('importFile').files[0];
+  $('importFile').value = '';
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (data.app !== 'fake-chat') throw new Error('not a Fake Chat backup');
+    if (!confirm('Replace your current viewers, memory and settings with this backup?')) return;
+    const settings = { ...(data.settings || {}) };
+    for (const k of SECRET) settings[k] = S[k]; // keep the key and password already here
+    localStorage.setItem('fakechat-html', JSON.stringify(settings));
+    if (Array.isArray(data.viewers) && data.viewers.length) localStorage.setItem('fakechat-viewers', JSON.stringify(data.viewers));
+    if (Array.isArray(data.memory)) localStorage.setItem('fakechat-memory', JSON.stringify(data.memory));
+    location.reload();
+  } catch (e) {
+    $('backupMsg').textContent = "Couldn't load that file: " + e.message;
+  }
+};
+
+// ---------- posting messages ----------
+const recentSpeech = [], recentChat = [], queue = [];
+let pending = [], pendingEvents = [], busy = false, lastGen = 0, lastActivity = Date.now(), debounce = 0, dripping = false;
+
+function enqueue(msgs) {
+  queue.push(...msgs);
+  while (queue.length > 24) queue.shift();
+  if (!dripping) drip();
+}
+function drip() {
+  const m = queue.shift();
+  if (!m) { dripping = false; return; }
+  dripping = true;
+  post(m);
+  // longer messages take longer to "type"
+  const base = (2700 - S.speed * 420) * (0.4 + Math.random() * 0.9);
+  const typing = Math.min(1500, (queue[0]?.msg?.length || 0) * 18);
+  later(drip, base + typing * (6 - S.speed) / 5);
+}
+function mentionsStreamer(msg) {
+  const n = S.streamer.trim().toLowerCase();
+  return n.length > 1 && msg.toLowerCase().includes(n);
+}
+function post({ user, msg }) {
+  user = viewerFor(user);
+  const v = viewers.get(user);
+  const m = { kind: 'chat', user, color: v.color, badge: v.badge, msg: String(msg).slice(0, 240) };
+  m.hl = mentionsStreamer(m.msg);
+  recentChat.push(`${user}: ${m.msg}`);
+  if (recentChat.length > 40) recentChat.shift();
+  out({ type: 'chat', m });
+  speak(m);
+}
+function postAlert(text) {
+  recentChat.push(`[ALERT] ${text}`);
+  out({ type: 'chat', m: { kind: 'alert', msg: text } });
+}
+$('clear').onclick = () => { queue.length = 0; recentChat.length = 0; out({ type: 'clear' }); };
+
+// ---------- fake alerts ----------
+const rand = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+let nextAlert = Date.now() + rand(90, 200) * 1000;
+function fireAlert() {
+  nextAlert = Date.now() + rand(150, 420) * 1000;
+  const r = Math.random();
+  let who = pickViewer(), text;
+  if (r < .35) {
+    text = `⭐ ${who} subscribed${Math.random() < .5 ? ` for ${rand(2, 30)} months` : ''}!`;
+    const v = viewers.get(who);
+    if (!v.badge) { v.badge = 'sub'; saveViewers(); drawViewers(); }
+  } else if (r < .6) {
+    who = makeName();
+    text = `💜 ${who} just followed`;
+  } else if (r < .78) {
+    text = `🎁 ${who} gifted ${pick([1, 5, 5, 10, 20])} subs!`;
+  } else if (r < .93) {
+    text = `💎 ${who} cheered ${pick([100, 200, 500, 1000])} bits`;
+  } else {
+    text = `🚀 ${cap(pick(NAME_A)) + cap(pick(NAME_B))} is raiding with ${rand(8, 120)} viewers!`;
+  }
+  postAlert(text);
+  pendingEvents.push(text);
+  lastActivity = Date.now();
+  scheduleGenerate(400);
+}
+$('testAlert').onclick = fireAlert;
+
+// ---------- generating messages ----------
+function howMany(kind) {
+  if (kind === 'idle') return 1 + Math.floor(Math.random() * Math.ceil(S.speed / 1.5));
+  return Math.max(2, S.speed) + Math.floor(Math.random() * 3);
+}
+function scheduleGenerate(wait = 900) {
+  const token = ++debounce;
+  later(() => { if (token === debounce) generate('speech'); }, wait);
+}
+async function generate(kind) {
+  if (busy) return;
+  const said = pending.join(' ').trim();
+  const events = pendingEvents.splice(0);
+  pending = [];
+  if (kind === 'speech' && !said && !events.length) return;
+  busy = true;
+  lastGen = Date.now();
+  const count = howMany(kind);
+  let msgs = [];
+  if (aiReady()) {
+    try {
+      msgs = await aiMessages(kind, said, events, count);
+      $('aiErr').textContent = '';
+      $('aiDot').className = 'dot good';
+    } catch (e) {
+      $('aiErr').textContent = 'AI error: ' + e.message + ' (using backup messages)';
+      $('aiDot').className = 'dot bad';
+    }
+  }
+  if (!msgs.length) msgs = fallbackMessages(kind, said, events, count);
+  if (said) { recentSpeech.push(said); if (recentSpeech.length > 12) recentSpeech.shift(); }
+  enqueue(dedupe(msgs));
+  busy = false;
+  if (pending.length || pendingEvents.length) scheduleGenerate();
+}
+
+// Drop messages chat already said recently. Tiny ones like "W" or "LUL" can repeat, real chat does that.
+function dedupe(msgs) {
+  const norm = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const seen = new Set(recentChat.concat(queue.map(q => 'x: ' + q.msg)).map(l => norm(l.slice(l.indexOf(':') + 1))));
+  return msgs.filter(m => {
+    const k = norm(m.msg);
+    if (k.length <= 6) return true;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+function buildPrompt(kind, said, events, count, hasScreen) {
+  const cast = [...viewers].slice(0, 60).map(([n, v]) =>
+    `- ${n}${v.badge ? ` [${v.badge}]` : ''} (${ACTIVITY[v.chat] || 'normal'}): ${v.note || 'regular viewer'}`).join('\n');
+  const streamer = S.streamer || 'the streamer';
+  // Stable part first (it gets cached), changing stuff goes in the user message
+  const system = `You are the live chat of a Twitch stream. You write what the viewers type. It has to feel like a real community: real people with their own personalities, who know each other, know the streamer, and actually pay attention.
+
+Streamer: ${streamer}
+Stream: ${S.topic || 'just chatting'}
+Overall chat vibe: ${VIBES[S.vibe] || VIBES.hype}${S.about ? `
+
+What the regulars already know about ${streamer}:
+${S.about}` : ''}
+
+The viewers (name [badge] (how much they talk): personality):
+${cast}
+
+Be a smart chat, not a generic one:
+- Pay attention. React to the specific thing that was said or shown, not a vague version of it. Pick up on details, implications, and what the streamer is feeling.
+- Viewers react to the streamer AND talk to each other. Reply with @name, keep side conversations going, agree, argue, ask follow ups, build on each other's jokes.
+- Use the memory. Call back to earlier moments, things the streamer told chat, bets, predictions and running jokes. Bring them up when it fits, not every time.
+- Know your stuff. When the streamer asks a real question (game mechanics, tips, where to go, facts, recommendations), the knowledgeable viewers give correct, specific answers in chat style, others joke or argue. Only the confidently-wrong type of viewer gets things wrong, and others may correct them.
+- Read the room. Big moments (wins, deaths, clutch plays, alerts, announcements) get a flood of reactions. Small talk gets a few. If the streamer sounds frustrated or down, chat gets supportive, even the trolls ease off.
+- Everyone stays in character: their personality, interests, and how they type. Chatty viewers talk a lot, lurkers hardly ever. Not everyone talks every time.
+- Every message adds something. Never reuse a message, joke or phrasing that's already in recent chat. Don't parrot the streamer's words back.
+- Mix lengths. Most messages are 1 to 10 words, some are just an emote, now and then one is a full sentence or two.
+- Type like real chat: lowercase, little punctuation, slang, the odd typo. Emotes like KEKW, LUL, Pog, W, L, o7, monkaS, Kappa, <3, Sadge are fine, don't overdo them. Nobody sounds like an assistant. No hashtags.
+- The streamer's words come from speech-to-text, so work out what they meant. Usernames get mangled too: if the streamer seems to say or reply to a viewer's name, match it to the closest name and have that viewer answer directly.
+- Messages are in time order, so later ones can react to earlier ones in the same batch.
+- Keep it fun. No slurs, hate, sexual content, or real personal attacks. Teasing is friendly banter only.
+- ${S.newViewers ? 'Use names from the list. Now and then a brand new viewer can show up with a name in the same style.' : 'Only use names from the list, spelled exactly.'}
+- When there's an image, it's the streamer's screen right now and viewers can see it. React to what's actually on it: plays, deaths, wins, menus, items, health, funny moments, small details a sharp viewer would notice.
+
+Memory notes: in "remember", add 0 to 2 short notes ONLY for new things worth bringing up later this stream or next time. Good: facts the streamer shared about themselves or their plans, big moments (beat a boss, died to something dumb), bets and predictions, running jokes, promises. Write each like "${streamer} said they've never beaten the Ender Dragon". Usually it's empty. Don't repeat what's already in memory.
+
+Reply with ONLY this JSON, no other text:
+{"messages":[{"user":"name","msg":"text"}],"remember":["note"]}`;
+
+  const parts = [];
+  if (memory.length) parts.push('Chat memory (things that happened before):\n' + memory.map(m => '- ' + m.t).join('\n'));
+  if (recentChat.length) parts.push('Recent chat (oldest first):\n' + recentChat.slice(-30).join('\n'));
+  if (recentSpeech.length) parts.push(`What ${streamer} said earlier (oldest first):\n` + recentSpeech.slice(-10).map(s => '- ' + s).join('\n'));
+  if (events.length) parts.push('Just happened on stream:\n' + events.map(e => '- ' + e).join('\n'));
+  if (said) parts.push(`${streamer} just said: "${said}"`);
+  if (kind === 'speech') parts.push(`Write the next ${count} chat messages. ${said ? `React to what ${streamer} just said` : 'React to what just happened'}, and keep any conversations between viewers going.`);
+  else if (hasScreen) parts.push(`${streamer} is quiet right now. Write the next ${count} chat messages: react to what's on screen, keep viewer conversations going, maybe ask ${streamer} something.`);
+  else parts.push(`${streamer} has gone quiet. Write the next ${count} chat messages: viewers chatting with each other, continuing earlier threads, or asking ${streamer} something.`);
+  return { system, user: parts.join('\n\n') };
+}
+
+async function aiMessages(kind, said, events, count) {
+  const shot = grabScreen();
+  const { system, user } = buildPrompt(kind, said, events, count, !!shot);
+  const model = modelName();
+  let text;
+  if (S.provider === 'anthropic') {
+    const content = shot
+      ? [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: shot } }, { type: 'text', text: user }]
+      : user;
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': S.apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true',
+      },
+      // cache_control makes repeat calls cheaper and faster: the rules and cast rarely change
+      body: JSON.stringify({ model, max_tokens: 1400, temperature: 1, system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }], messages: [{ role: 'user', content }] }),
+      signal: AbortSignal.timeout(S.brain === 'genius' ? 60000 : 35000),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error?.message || `HTTP ${r.status}`);
+    text = (j.content || []).map(c => c.text || '').join('');
+  } else {
+    const base = (S.baseUrl || 'https://api.openai.com/v1').replace(/\/+$/, '');
+    const headers = { 'content-type': 'application/json' };
+    if (S.apiKey) headers.authorization = `Bearer ${S.apiKey}`;
+    const content = shot
+      ? [{ type: 'image_url', image_url: { url: 'data:image/jpeg;base64,' + shot } }, { type: 'text', text: user }]
+      : user;
+    const r = await fetch(`${base}/chat/completions`, {
+      method: 'POST', headers,
+      body: JSON.stringify({ model, messages: [{ role: 'system', content: system }, { role: 'user', content }] }),
+      signal: AbortSignal.timeout(30000),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.error?.message || `HTTP ${r.status}`);
+    text = j.choices?.[0]?.message?.content || '';
+  }
+  const reply = parseReply(text);
+  remember(reply.remember);
+  return reply.messages.slice(0, count + 4);
+}
+
+// Reads {"messages":[...],"remember":[...]}, or a plain array of messages
+function parseReply(text) {
+  text = String(text).replace(/<think>[\s\S]*?<\/think>/g, '').replace(/```(?:json)?/g, '');
+  const clean = arr => (Array.isArray(arr) ? arr : [])
+    .filter(m => m && typeof m.msg === 'string' && m.msg.trim())
+    .map(m => ({ user: m.user, msg: m.msg.trim() }));
+  const o = text.indexOf('{'), a = text.indexOf('[');
+  if (o >= 0 && (a < 0 || o < a)) {
+    try {
+      const j = JSON.parse(text.slice(o, text.lastIndexOf('}') + 1));
+      return { messages: clean(j.messages), remember: Array.isArray(j.remember) ? j.remember : [] };
+    } catch {}
+  }
+  if (a >= 0) {
+    try { return { messages: clean(JSON.parse(text.slice(a, text.lastIndexOf(']') + 1))), remember: [] }; } catch {}
+  }
+  return { messages: [], remember: [] };
+}
+
+// Backup messages for offline mode or when the AI fails
+const GENERIC = {
+  hype: ['LETS GOOO', 'W', 'Pog', 'POGGERS', 'HYPE', 'no way', 'W streamer', 'sheeeesh', '🔥🔥🔥', 'insane'],
+  chill: ['lol', 'true', 'fair', 'real', 'haha', 'nice', 'vibes', 'same tbh', 'lmao', 'mood'],
+  wholesome: ['<3', 'love this stream', 'ur doing great', 'so wholesome', 'hi chat <3', 'glad i caught this live', 'good vibes only'],
+  roast: ['KEKW', 'bro what', 'L take', 'sure buddy', 'skill issue', 'we believe you Kappa', '💀', 'ratio'],
+  chaos: ['KEKW', '???', 'LUL LUL LUL', 'chat is this real', 'first', 'monkaS', 'KEKW KEKW', 'i am a potato'],
+};
+const ANSWERS = ['yes', 'nah', 'yeah', 'no way', 'maybe', '100%', 'depends', 'idk', 'YES', 'nope'];
+const IDLE = ['hi chat', 'what are we doing today', 'first time here', 'hows everyone', 'lurking o7', 'any plans for later?', 'chat is quiet', 'what time is it there', 'o7', 'gm chat'];
+const CONGRATS = ['W', 'welcome!!', 'LETS GO', 'ty for the support <3', 'Pog', 'hype', '<3 <3', 'W supporter'];
+function fallbackMessages(kind, said, events, count) {
+  const pool = GENERIC[S.vibe] || GENERIC.hype;
+  const words = said.split(/\s+/).map(w => w.replace(/[^\w']/g, '').toLowerCase()).filter(w => w.length > 4);
+  const question = said.includes('?') || /^(what|who|how|why|should|do|does|is|are|can|would|anyone)\b/i.test(said);
+  const out = [];
+  for (let i = 0; i < count; i++) {
+    let msg;
+    if (events.length && i < 3) msg = pick(CONGRATS);
+    else if (kind === 'idle') msg = pick(IDLE);
+    else if (question && Math.random() < 0.6) msg = pick(ANSWERS);
+    else if (words.length && Math.random() < 0.3) msg = pick([`${pick(words)}?? LUL`, `"${pick(words)}" KEKW`, `${pick(words)} is real`]);
+    else msg = pick(pool);
+    out.push({ user: pickViewer(), msg });
+  }
+  return out;
+}
+
+// Idle chatter and alerts
+(function loop() {
+  later(loop, 1000);
+  if (S.alerts && Date.now() > nextAlert && !busy) { fireAlert(); return; }
+  if (!S.idle || busy || queue.length) return;
+  const gap = [0, 45, 30, 20, 14, 9][S.speed] * 1000;
+  if (Date.now() - lastActivity > gap && Date.now() - lastGen > gap) {
+    lastActivity = Date.now();
+    generate('idle');
+  }
+})();
+
+// ---------- voices ----------
+let ttsQueued = 0, lastTtsEnd = 0;
+const EMOTES = /\b(KEKW|LUL|Pog|POGGERS|PogChamp|monkaS|Kappa|o7|Sadge|W|L)\b/g;
+function speak(m) {
+  if (!S.tts || !window.speechSynthesis || ttsQueued >= 3) return; // skip some so it keeps up
+  const text = m.msg.replace(/@([A-Za-z0-9_]+)/g, '$1').replace(EMOTES, '').replace(/<3/g, '').replace(/[^\p{L}\p{N}\s?!.,']/gu, '').trim();
+  if (!text) return;
+  const u = new SpeechSynthesisUtterance(text.slice(0, 160));
+  const voices = speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
+  const h = hash(m.user);
+  if (voices.length) u.voice = voices[h % voices.length];
+  u.pitch = 0.6 + (h % 9) / 10;
+  u.rate = 1 + (h % 4) / 10;
+  u.volume = S.ttsVol / 100;
+  ttsQueued++;
+  u.onend = u.onerror = () => { ttsQueued = Math.max(0, ttsQueued - 1); lastTtsEnd = Date.now(); };
+  speechSynthesis.speak(u);
+}
+if (window.speechSynthesis) speechSynthesis.getVoices();
+$('tts').addEventListener('change', () => { if (!S.tts && window.speechSynthesis) { speechSynthesis.cancel(); ttsQueued = 0; } });
+const ttsTalking = () => window.speechSynthesis && (speechSynthesis.speaking || Date.now() - lastTtsEnd < 700);
+
+// ---------- screen ----------
+let screenStream = null;
+const vid = $('screenVid');
+const canvas = document.createElement('canvas');
+$('screenBtn').onclick = async () => {
+  $('screenErr').textContent = '';
+  if (screenStream) return stopScreen();
+  if (inFrame) { $('screenErr').textContent = "Screen sharing doesn't work in a preview. Open the file straight in Chrome."; return; }
+  if (!navigator.mediaDevices?.getDisplayMedia) { $('screenErr').textContent = 'This browser cannot share the screen. Use Chrome or Edge.'; return; }
+  try {
+    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 5 }, audio: false });
+  } catch (e) {
+    if (e.name !== 'NotAllowedError') $('screenErr').textContent = 'Could not share screen: ' + e.message;
+    return;
+  }
+  vid.srcObject = screenStream;
+  vid.play().catch(() => {});
+  vid.classList.remove('hide');
+  screenStream.getVideoTracks()[0].onended = stopScreen;
+  $('screenBtn').textContent = 'Stop sharing';
+  $('screenBtn').classList.add('on');
+  $('screenDot').className = 'dot good';
+  $('screenLabel').textContent = aiReady() ? 'Chat can see' : 'Sharing (needs AI to see)';
+};
+function stopScreen() {
+  if (screenStream) screenStream.getTracks().forEach(t => t.stop());
+  screenStream = null;
+  vid.srcObject = null;
+  vid.classList.add('hide');
+  $('screenBtn').textContent = 'Share screen';
+  $('screenBtn').classList.remove('on');
+  $('screenDot').className = 'dot';
+  $('screenLabel').textContent = 'Not sharing';
+}
+function grabScreen() {
+  if (!screenStream || !vid.videoWidth) return null;
+  const scale = Math.min(1, 1024 / vid.videoWidth);
+  canvas.width = Math.round(vid.videoWidth * scale);
+  canvas.height = Math.round(vid.videoHeight * scale);
+  canvas.getContext('2d').drawImage(vid, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', 0.7).split(',')[1];
+}
+
+// ---------- you talking ----------
+function sendText(text) {
+  text = text.trim();
+  if (!text) return;
+  $('heard').innerHTML = '<b></b>';
+  $('heard').firstChild.textContent = text;
+  pending.push(text.slice(0, 500));
+  lastActivity = Date.now();
+  scheduleGenerate();
+}
+$('send').onclick = () => { sendText($('say').value); $('say').value = ''; };
+$('say').addEventListener('keydown', e => { if (e.key === 'Enter') $('send').onclick(); });
+
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let rec = null, listening = false;
+if (!SR) {
+  $('mic').disabled = true;
+  $('mic').textContent = 'Voice needs Chrome or Edge';
+  $('micErr').textContent = 'This browser has no speech recognition. Typing still works.';
+} else {
+  rec = new SR();
+  rec.continuous = true;
+  rec.interimResults = true;
+  rec.lang = navigator.language || 'en-NZ';
+  rec.onresult = e => {
+    if (ttsTalking()) return; // that's chat's voice, not you
+    let interim = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const r = e.results[i];
+      if (r.isFinal) sendText(r[0].transcript);
+      else interim += r[0].transcript;
+    }
+    if (interim) { $('heard').innerHTML = '<span></span>'; $('heard').firstChild.textContent = interim + '...'; }
+  };
+  rec.onerror = e => {
+    if (e.error === 'no-speech' || e.error === 'aborted') return;
+    $('micErr').textContent = e.error === 'not-allowed'
+      ? 'Mic blocked. Click the icon at the left of the address bar, allow the microphone, then reload.'
+      : e.error === 'network' ? 'Speech recognition needs internet. Check your connection.' : 'Mic error: ' + e.error;
+    if (e.error === 'not-allowed') setListening(false);
+  };
+  rec.onstart = () => { if (listening) $('heard').innerHTML = '<span>Listening. Say something...</span>'; };
+  // Chrome stops listening every so often. Restart it while we're meant to be on.
+  rec.onend = () => { if (listening) setTimeout(startRec, 250); };
+  $('mic').onclick = () => setListening(!listening);
+}
+// Holding the mic open the whole time stops Chrome from asking again.
+// For a file on your PC Chrome only gives "allow this time" access, which
+// runs out when the tab sits in the background unless the mic is in use.
+let micStream = null;
+async function setListening(on) {
+  $('micErr').textContent = '';
+  if (on) {
+    if (inFrame) { $('micErr').textContent = "The mic doesn't work in a preview. Open the file straight in Chrome."; return; }
+    if (!micStream || !micStream.active) {
+      try {
+        micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+        micStream.getAudioTracks()[0].onended = () => { micStream = null; if (listening) setListening(true); };
+      } catch (e) {
+        micStream = null;
+        $('micErr').textContent = e.name === 'NotFoundError'
+          ? 'No microphone found. Plug one in or check your sound settings.'
+          : 'Mic blocked. Click the icon at the left of the address bar, allow the microphone, then reload.';
+        saveListening(false);
+        return;
+      }
+    }
+    listening = true;
+    startRec();
+  } else {
+    listening = false;
+    try { rec.stop(); } catch {}
+    if (micStream) { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+  }
+  saveListening(listening);
+  $('mic').classList.toggle('on', listening);
+  $('mic').textContent = listening ? 'Stop listening' : 'Start listening';
+}
+// Feed speech recognition the mic we already have open. Without this, Chrome
+// asks for the mic again every time recognition restarts (every few seconds).
+function startRec() {
+  if (!listening) return;
+  const track = micStream && micStream.getAudioTracks()[0];
+  try {
+    if (track && track.readyState === 'live') rec.start(track);
+    else rec.start();
+  } catch (e) {
+    if (e.name === 'InvalidStateError' && /already started/i.test(e.message)) return;
+    try { rec.start(); } catch {}
+  }
+}
+// Remember if you were listening, so opening the page next time starts straight away
+function saveListening(on) { try { localStorage.setItem('fakechat-listening', on ? '1' : ''); } catch {} }
+function wasListening() { try { return localStorage.getItem('fakechat-listening') === '1'; } catch { return false; } }
+
+loadForm();
+previewR.style(chatStyle());
+drawViewers();
+drawMemory();
+if (rec && wasListening() && !inFrame) setListening(true);
+}
+</script>
+</body>
+<!--
+The "Minecraft" font option uses Monocraft (https://github.com/IdreesInc/Monocraft),
+trimmed to basic Latin characters and embedded above. Its licence follows.
+
+Copyright (c) 2022, Idrees Hassan (https://github.com/IdreesInc/Monocraft)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+
+
+- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007
+- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- -- --
+
+PREAMBLE
+The goals of the Open Font License (OFL) are to stimulate worldwide
+development of collaborative font projects, to support the font creation
+efforts of academic and linguistic communities, and to provide a free and
+open framework in which fonts may be shared and improved in partnership
+with others.
+
+The OFL allows the licensed fonts to be used, studied, modified and
+redistributed freely as long as they are not sold by themselves. The
+fonts, including any derivative works, can be bundled, embedded,
+redistributed and/or sold with any software provided that any reserved
+names are not used by derivative works. The fonts and derivatives,
+however, cannot be released under any other type of license. The
+requirement for fonts to remain under this license does not apply
+to any document created using the fonts or their derivatives.
+
+DEFINITIONS
+"Font Software" refers to the set of files released by the Copyright
+Holder(s) under this license and clearly marked as such. This may
+include source files, build scripts and documentation.
+
+"Reserved Font Name" refers to any names specified as such after the
+copyright statement(s).
+
+"Original Version" refers to the collection of Font Software components as
+distributed by the Copyright Holder(s).
+
+"Modified Version" refers to any derivative made by adding to, deleting,
+or substituting - - in part or in whole - - any of the components of the
+Original Version, by changing formats or by porting the Font Software to a
+new environment.
+
+"Author" refers to any designer, engineer, programmer, technical
+writer or other person who contributed to the Font Software.
+
+PERMISSION & CONDITIONS
+Permission is hereby granted, free of charge, to any person obtaining
+a copy of the Font Software, to use, study, copy, merge, embed, modify,
+redistribute, and sell modified and unmodified copies of the Font
+Software, subject to the following conditions:
+
+1) Neither the Font Software nor any of its individual components,
+in Original or Modified Versions, may be sold by itself.
+
+2) Original or Modified Versions of the Font Software may be bundled,
+redistributed and/or sold with any software, provided that each copy
+contains the above copyright notice and this license. These can be
+included either as stand-alone text files, human-readable headers or
+in the appropriate machine-readable metadata fields within text or
+binary files as long as those fields can be easily viewed by the user.
+
+3) No Modified Version of the Font Software may use the Reserved Font
+Name(s) unless explicit written permission is granted by the corresponding
+Copyright Holder. This restriction only applies to the primary font name as
+presented to the users.
+
+4) The name(s) of the Copyright Holder(s) or the Author(s) of the Font
+Software shall not be used to promote, endorse or advertise any
+Modified Version, except to acknowledge the contribution(s) of the
+Copyright Holder(s) and the Author(s) or with their explicit written
+permission.
+
+5) The Font Software, modified or unmodified, in part or in whole,
+must be distributed entirely under this license, and must not be
+distributed under any other license. The requirement for fonts to
+remain under this license does not apply to any document created
+using the Font Software.
+
+TERMINATION
+This license becomes null and void if any of the above conditions are
+not met.
+
+DISCLAIMER
+THE FONT SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO ANY WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT
+OF COPYRIGHT, PATENT, TRADEMARK, OR OTHER RIGHT. IN NO EVENT SHALL THE
+COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+INCLUDING ANY GENERAL, SPECIAL, INDIRECT, INCIDENTAL, OR CONSEQUENTIAL
+DAMAGES, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF THE USE OR INABILITY TO USE THE FONT SOFTWARE OR FROM
+OTHER DEALINGS IN THE FONT SOFTWARE.
+
+-->
+</html>
