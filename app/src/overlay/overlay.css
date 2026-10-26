@@ -187,3 +187,27 @@
 .fc-clickable { cursor: pointer; border-radius: var(--fc-radius); }
 .fc-clickable:hover { outline: 2px solid rgba(255, 255, 255, 0.35); outline-offset: 2px; }
 .fc-clickable:focus-visible { outline: 2px solid var(--fc-accent); outline-offset: 2px; }
+
+/* ---------- solid mode: the green screen pop-out window ----------
+   Chroma key can't do see-through. Anything half transparent would mix
+   with the green and get keyed badly, so draw it all solid and crisp. */
+.fc-solid .fc-msg { transition: none; }
+.fc-solid.fc-anim-slide .fc-msg { animation: fc-slide-solid 0.3s cubic-bezier(.2,.9,.3,1.2) both; }
+.fc-solid.fc-anim-pop .fc-msg { animation: fc-pop-solid 0.3s cubic-bezier(.2,.9,.3,1.4) both; }
+.fc-solid.fc-anim-fade .fc-msg { animation: none; }
+@keyframes fc-slide-solid { from { transform: translateY(12px); } }
+@keyframes fc-pop-solid { from { transform: scale(0.85); } }
+.fc-solid.fc-outline-shadow .fc-msg,
+.fc-solid.fc-outline-glow .fc-msg { text-shadow: 0.08em 0.08em 0 #000; }
+.fc-solid.fc-outline-glow .fc-name { text-shadow: 0.08em 0.08em 0 #000; }
+.fc-solid.fc-outline-outline .fc-msg { text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 0 #000; }
+.fc-solid.fc-bubbled .fc-msg:not(.fc-alert) { text-shadow: none; }
+.fc-solid .fc-system { opacity: 1; color: #c8c3d8; }
+.fc-solid .fc-alert { text-shadow: none; }
+.fc-solid .fc-outline-glow .fc-alert, .fc-solid.fc-outline-glow .fc-alert { box-shadow: none; }
+.fc-solid .fc-poll { background: #100c20; animation: none; }
+.fc-solid .fc-poll-opt { background: #262036; }
+.fc-solid .fc-poll-bar { background: #4a3d74; }
+.fc-solid .fc-win .fc-poll-bar { background: var(--fc-accent); opacity: 1; }
+.fc-solid .fc-poll-foot { opacity: 1; color: #b9b3cc; }
+.fc-solid .fc-clickable:hover { outline: none; }

@@ -3,6 +3,7 @@ import { createStore, storage } from '../lib/store';
 import { every, later } from '../lib/timers';
 import { streamerSaid } from './chat';
 import { ttsTalking } from './tts';
+import { createWhisper, whisperReady } from './whisper';
 
 type Status = 'off' | 'starting' | 'listening' | 'error';
 export const mic = createStore({
@@ -31,6 +32,23 @@ let interim = '';
 let committed = '';   // interim text we already sent because you paused
 
 const LISTEN_KEY = 'fc2-listening';
+const usingWhisper = () => settings.get().sttEngine === 'whisper';
+
+const whisper = createWhisper({
+  onText: text => { if (want) { mic.set({ error: '' }); streamerSaid(text); } },
+  onSpeaking: on => { if (want) mic.set({ interim: on ? '...' : '' }); },
+  onError: msg => mic.set({ error: msg }),
+  isTtsTalking: ttsTalking,
+});
+
+async function startEngineFor(s: MediaStream) {
+  if (usingWhisper()) {
+    try { await whisper.start(s); mic.set({ status: 'listening', error: '' }); }
+    catch (e) { mic.set({ status: 'error', error: 'Could not start Whisper listening: ' + (e as Error).message }); stop(false); }
+  } else {
+    startRec();
+  }
+}
 
 // ---------- mic ----------
 async function acquireMic() {
@@ -102,7 +120,8 @@ async function reacquire() {
   if (!want) return;
   try {
     await acquireMic();
-    restartRec();
+    if (usingWhisper()) await startEngineFor(stream!);
+    else restartRec();
   } catch {
     mic.set({ status: 'error', error: 'Lost the microphone. Check it is plugged in, then press Start listening.' });
     stop(false);
@@ -230,7 +249,11 @@ function flushInterim() { if (interim && want) commitInterim(); interim = ''; co
 
 // ---------- public ----------
 export async function start() {
-  if (!mic.get().supported) {
+  if (usingWhisper() && !whisperReady()) {
+    mic.set({ status: 'error', error: 'Whisper needs a key. Add one on the Mic and voices page, or switch back to Chrome recognition.' });
+    return;
+  }
+  if (!usingWhisper() && !mic.get().supported) {
     mic.set({ status: 'error', error: 'Voice needs Chrome or Edge. Typing still works.' });
     return;
   }
@@ -254,14 +277,17 @@ export async function start() {
     return;
   }
   storage.write(LISTEN_KEY, true);
-  startRec();
+  await startEngineFor(stream!);
+  if (!want) return;
   stopWatchdog?.();
   stopWatchdog = every(() => {
     if (!want) return;
     const quiet = Date.now() - lastAlive;
     // stuck starting, or silently frozen: kick it
-    if ((recState === 'starting' && quiet > 8000) || (recState === 'running' && quiet > 75000)) restartRec();
-    if (recState === 'idle') startRec();
+    if (!usingWhisper()) {
+      if ((recState === 'starting' && quiet > 8000) || (recState === 'running' && quiet > 75000)) restartRec();
+      if (recState === 'idle') startRec();
+    }
     if (stream && stream.getAudioTracks()[0]?.readyState === 'ended') void reacquire();
   }, 4000);
 }
@@ -274,6 +300,7 @@ export function stop(remember = true) {
   interim = ''; committed = '';
   try { rec?.abort(); } catch { /* fine */ }
   recState = 'idle';
+  whisper.stop();
   releaseMic();
   const s = mic.get().status;
   mic.set({ status: s === 'error' ? 'error' : 'off', interim: '' });
@@ -283,9 +310,14 @@ export const isListening = () => want;
 export const wasListening = () => storage.read(LISTEN_KEY, false);
 
 // Picking a different mic or language takes effect straight away
-let prevMic = settings.get().micId, prevLang = settings.get().lang;
+let prevMic = settings.get().micId, prevLang = settings.get().lang, prevEngine = settings.get().sttEngine;
 settings.subscribe(() => {
   const s = settings.get();
+  if (s.sttEngine !== prevEngine) {
+    prevEngine = s.sttEngine;
+    if (want) { stop(false); void start(); }
+    return;
+  }
   if (s.micId !== prevMic) { prevMic = s.micId; if (want) void reacquire(); }
   if (s.lang !== prevLang) { prevLang = s.lang; if (rec) { rec.lang = s.lang || navigator.language || 'en-NZ'; if (want) restartRec(); } }
 });

@@ -26,6 +26,7 @@ export const DEFAULT_SETTINGS: Settings = {
   alerts: true, alertMinutes: 4, viewerCount: 42, newViewers: false, learn: true,
   provider: 'none', apiKey: '', brain: 'smart', model: '', baseUrl: '',
   micId: '', lang: '', pauseMs: 1100, showTyped: true,
+  sttEngine: 'browser', sttUrl: 'https://api.groq.com/openai/v1', sttKey: '', sttModel: 'whisper-large-v3-turbo', vocab: '',
   tts: false, ttsVol: 80, ttsRate: 1, ttsChance: 60, ttsNames: false,
   obsHost: '127.0.0.1:4455', obsPass: '', obsAuto: true, popBg: '#00ff00',
   setupDone: false,

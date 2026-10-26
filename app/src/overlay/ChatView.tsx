@@ -65,13 +65,15 @@ function PollCard({ poll, now }: { poll: Poll; now: number }) {
   );
 }
 
-export function lookVars(look: Look): CSSProperties {
+/** solid: for a green screen window. Anything see-through would mix with the key colour, so it's drawn solid instead. */
+export function lookVars(look: Look, solid = false): CSSProperties {
+  const a = (pct: number) => (solid ? (pct > 0 ? 1 : 0) : pct / 100);
   return {
     '--fc-font': FONTS[look.font]?.css || FONTS.inter.css,
     '--fc-size': look.size + 'px',
     '--fc-text': look.textColor,
-    '--fc-bubble': hexToRgba(look.bubbleColor, look.bubbleOpacity / 100),
-    '--fc-panel': hexToRgba(look.panelColor, look.panelOpacity / 100),
+    '--fc-bubble': hexToRgba(look.bubbleColor, a(look.bubbleOpacity)),
+    '--fc-panel': hexToRgba(look.panelColor, a(look.panelOpacity)),
     '--fc-radius': look.radius + 'px',
     '--fc-accent': look.accent,
     '--fc-accent-soft': hexToRgba(look.accent, 0.22),
@@ -80,7 +82,7 @@ export function lookVars(look: Look): CSSProperties {
 }
 
 /** The chat as it appears on stream. */
-export function ChatView({ state, onMessageClick, className = '' }: { state: OverlayState; onMessageClick?: (m: Msg) => void; className?: string }) {
+export function ChatView({ state, onMessageClick, className = '', solid = false }: { state: OverlayState; onMessageClick?: (m: Msg) => void; className?: string; solid?: boolean }) {
   const { look } = state;
   const [now, setNow] = useState(Date.now());
   const ticking = look.fade > 0 || (state.poll && !state.poll.done);
@@ -91,15 +93,16 @@ export function ChatView({ state, onMessageClick, className = '' }: { state: Ove
   }, [ticking]);
 
   const life = look.fade * 1000;
-  const visible = state.messages.filter(m => !life || now - m.at < life + 700).slice(-look.max);
+  // solid mode skips the fade-out: a half-faded message would turn green
+  const visible = state.messages.filter(m => !life || now - m.at < life + (solid ? 0 : 700)).slice(-look.max);
   const cls = [
     'fc-root', className, `fc-anim-${look.animation}`, `fc-outline-${look.outline}`, `fc-names-${look.nameStyle}`,
-    look.align === 'right' ? 'fc-right' : '', look.fadeTop ? 'fc-fadetop' : '',
+    look.align === 'right' ? 'fc-right' : '', look.fadeTop && !solid ? 'fc-fadetop' : '', solid ? 'fc-solid' : '',
     look.bubbleOpacity > 0 ? 'fc-bubbled' : '', look.avatars ? 'fc-has-avatars' : '', look.font === 'minecraft' || look.font === 'pixel' ? 'fc-pixel' : '',
   ].filter(Boolean).join(' ');
 
   return (
-    <div className={cls} style={lookVars(look)}>
+    <div className={cls} style={lookVars(look, solid)}>
       {look.showPoll && state.poll && <PollCard poll={state.poll} now={now} />}
       <div className="fc-list">
         {visible.map(m => <Message key={m.id} m={m} look={look} leaving={!!life && now - m.at > life} onClick={onMessageClick} />)}

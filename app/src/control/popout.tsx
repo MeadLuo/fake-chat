@@ -12,7 +12,7 @@ function PopChat() {
   const state = useStore(feed, s => s);
   const bg = useStore(settings, s => s.popBg);
   useEffect(() => { if (win) win.document.body.style.background = bg; }, [bg]);
-  return <ChatView state={state} />;
+  return <ChatView state={state} solid />;
 }
 
 /** Opens the chat in its own window, for Window Capture + chroma key in OBS. */
@@ -25,14 +25,23 @@ export function openPopout(): string | null {
   doc.open();
   doc.write('<!doctype html><html><head><meta charset="utf-8"><title>Fake Chat for OBS</title></head><body style="margin:0;height:100vh;overflow:hidden"><div id="pop" style="position:fixed;inset:0"></div></body></html>');
   doc.close();
-  // bring over the page's styles and fonts
+  // bring over the page's styles and fonts, and draw once they've loaded
+  const loading: Promise<unknown>[] = [];
   document.querySelectorAll('link[rel="stylesheet"], style').forEach(el => {
     const copy = doc.importNode(el, true) as HTMLElement;
-    if (el instanceof HTMLLinkElement) (copy as HTMLLinkElement).href = el.href;
+    if (el instanceof HTMLLinkElement) {
+      (copy as HTMLLinkElement).href = el.href;
+      loading.push(new Promise(r => { copy.addEventListener('load', r); copy.addEventListener('error', r); }));
+    }
     doc.head.append(copy);
   });
-  root = createRoot(doc.getElementById('pop')!);
-  root.render(<PopChat />);
+  const target = win;
+  const draw = () => {
+    if (win !== target || root) return;
+    root = createRoot(doc.getElementById('pop')!);
+    root.render(<PopChat />);
+  };
+  void Promise.race([Promise.all(loading), new Promise(r => setTimeout(r, 2500))]).then(draw);
   win.addEventListener('beforeunload', () => { root?.unmount(); root = null; win = null; });
   return null;
 }

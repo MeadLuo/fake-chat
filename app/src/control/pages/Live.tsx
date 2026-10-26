@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { BarChart3, Ban, Clock, Eraser, ExternalLink, MessageSquareReply, MonitorUp, MonitorX, PartyPopper, Send, Trash2, UserRound, X } from 'lucide-react';
 import { clearChat, closePoll, endPoll, fireAlert, live, removeMessage, sayAs, startPoll, streamerSaid, timeout, type AlertType } from '../../engine/chat';
 import { mic, micLevel, start as startMic, stop as stopMic } from '../../engine/speech';
@@ -18,8 +18,15 @@ import type { PageProps } from '../App';
 export function LivePage({ go }: PageProps) {
   const state = useStore(feed, s => s);
   const [selected, setSelected] = useState<Msg | null>(null);
-  const [popErr, setPopErr] = useState('');
+  const [pop, setPop] = useState<{ tone: 'bad' | 'info'; text: ReactNode } | null>(null);
   const sayRef = useRef<HTMLInputElement>(null);
+  const popOut = () => {
+    const err = openPopout();
+    setPop(err ? { tone: 'bad', text: err } : {
+      tone: 'info',
+      text: <>The green is meant to disappear. In OBS, add a <b>Window Capture</b> of that window, then right click it, <b>Filters</b>, and add <b>Chroma Key</b>. Boxes are drawn solid there so they key cleanly. For see-through boxes, use <button className="link" onClick={() => go('obs')}>Connect to OBS</button> instead.</>,
+    });
+  };
 
   return (
     <div className="live">
@@ -27,7 +34,7 @@ export function LivePage({ go }: PageProps) {
         <header className="stage-bar">
           <StatusRow go={go} />
           <div className="stage-tools">
-            <button className="btn ghost sm" onClick={() => { setPopErr(openPopout() || ''); }} title="Open the chat in its own window">
+            <button className="btn ghost sm" onClick={popOut} title="Open the chat in its own window">
               <ExternalLink size={15} /> Pop out
             </button>
             <button className="btn ghost sm" onClick={clearChat} title="Clear the chat">
@@ -35,7 +42,7 @@ export function LivePage({ go }: PageProps) {
             </button>
           </div>
         </header>
-        {popErr && <Notice tone="bad" action={<button className="icon-btn" onClick={() => setPopErr('')} aria-label="Dismiss"><X size={16} /></button>}>{popErr}</Notice>}
+        {pop && <Notice tone={pop.tone} action={<button className="icon-btn" onClick={() => setPop(null)} aria-label="Dismiss"><X size={16} /></button>}>{pop.text}</Notice>}
         <div className="stage-screen">
           {state.messages.length === 0 && !state.poll && (
             <div className="stage-empty">
@@ -94,7 +101,9 @@ function StatusRow({ go }: PageProps) {
 function MicOrb() {
   const status = useStore(mic, s => s.status);
   const error = useStore(mic, s => s.error);
-  const supported = useStore(mic, s => s.supported);
+  const browserSR = useStore(mic, s => s.supported);
+  const whisperOn = useStore(settings, s => s.sttEngine === 'whisper');
+  const supported = browserSR || whisperOn;
   const ref = useRef<HTMLButtonElement>(null);
   const on = status === 'listening' || status === 'starting';
 
@@ -121,7 +130,7 @@ function MicOrb() {
       </button>
       <div className="orb-text">
         <strong>{label}</strong>
-        <span>{on ? 'Tap to stop. Chat hears everything you say.' : 'Chat reacts to what you say out loud.'}</span>
+        <span>{on ? `Tap to stop. ${whisperOn ? 'Whisper' : 'Chrome'} is listening.` : 'Chat reacts to what you say out loud.'}</span>
       </div>
       {error && <Notice tone="bad">{error}</Notice>}
     </div>

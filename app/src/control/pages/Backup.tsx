@@ -7,7 +7,7 @@ import { cast, memory } from '../../lib/viewers';
 import type { Look, Settings, Viewer } from '../../lib/types';
 import { Group, Notice, Page } from '../ui';
 
-const SECRET: (keyof Settings)[] = ['apiKey', 'obsPass'];
+const SECRET: (keyof Settings)[] = ['apiKey', 'obsPass', 'sttKey'];
 
 function exportAll() {
   const s: Partial<Settings> = { ...settings.get() };
@@ -23,7 +23,7 @@ function exportAll() {
 // Reads backups from this version and from the old single-file version
 function importAll(data: any) {
   if (data?.app !== 'fake-chat') throw new Error("That file isn't a Fake Chat backup.");
-  const keep = { apiKey: settings.get().apiKey, obsPass: settings.get().obsPass };
+  const keep = { apiKey: settings.get().apiKey, obsPass: settings.get().obsPass, sttKey: settings.get().sttKey };
   const old = data.version === 1;
   const raw = data.settings || {};
   let next: Settings;
@@ -90,7 +90,7 @@ export function BackupPage() {
           <button className="btn ghost" onClick={() => {
             if (!confirm('Reset all settings? Your API key and OBS password are kept.')) return;
             const s = settings.get();
-            settings.set({ ...DEFAULT_SETTINGS, apiKey: s.apiKey, obsPass: s.obsPass, setupDone: true });
+            settings.set({ ...DEFAULT_SETTINGS, apiKey: s.apiKey, obsPass: s.obsPass, sttKey: s.sttKey, setupDone: true });
           }}>Reset settings</button>
           <button className="btn ghost" onClick={() => settings.set({ setupDone: false })}>Run the setup again</button>
         </div>

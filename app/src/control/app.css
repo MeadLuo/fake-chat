@@ -378,3 +378,5 @@ select.input { appearance: none; padding-right: 32px; background-image: url("dat
   .viewer select { grid-column: 2 / 3; }
   .viewer .vnote { grid-column: 1 / -1; }
 }
+.link { border: 0; background: none; padding: 0; color: var(--voice); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.notice b { color: var(--text); }

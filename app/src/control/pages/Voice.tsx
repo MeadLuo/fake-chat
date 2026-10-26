@@ -1,11 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
-import { Volume2 } from 'lucide-react';
+import { Eye, EyeOff, Volume2 } from 'lucide-react';
 import { mic, micLevel, refreshDevices, start as startMic } from '../../engine/speech';
 import { speak, voices } from '../../engine/tts';
 import { settings } from '../../lib/settings';
 import { useStore } from '../../lib/store';
 import { pickViewer } from '../../lib/viewers';
-import { Field, Group, Notice, Page, Select, Slider, Toggle } from '../ui';
+import { Field, Group, Notice, Page, Segmented, Select, Slider, Toggle } from '../ui';
+
+const STT_PRESETS = [
+  { label: 'Groq (fast, has a free tier)', url: 'https://api.groq.com/openai/v1', model: 'whisper-large-v3-turbo' },
+  { label: 'OpenAI', url: 'https://api.openai.com/v1', model: 'gpt-transcribe' },
+];
 
 const LANGS = [
   ['', 'Same as my browser'], ['en-NZ', 'English (New Zealand)'], ['en-AU', 'English (Australia)'], ['en-GB', 'English (UK)'], ['en-US', 'English (US)'],
@@ -29,6 +34,7 @@ export function VoicePage() {
   const status = useStore(mic, x => x.status);
   const error = useStore(mic, x => x.error);
   const [voiceCount, setVoiceCount] = useState(voices().length);
+  const [showKey, setShowKey] = useState(false);
   useEffect(() => {
     void refreshDevices();
     const t = setTimeout(() => setVoiceCount(voices().length), 600);
@@ -43,7 +49,7 @@ export function VoicePage() {
             <Select id={id} value={s.micId} onChange={v => settings.set({ micId: v })}
               options={[{ value: '', label: 'Default mic' }, ...devices.map(d => ({ value: d.id, label: d.label }))]} />
           )}</Field>
-          <Field label="Language you speak">{id => (
+          <Field label="Language you speak" hint="Picking your accent, like English (New Zealand), helps Chrome a lot.">{id => (
             <Select id={id} value={s.lang} onChange={v => settings.set({ lang: v })} options={LANGS.map(([value, label]) => ({ value, label }))} />
           )}</Field>
           <Field label="Level" hint={status === 'listening' ? 'Talk and this should move.' : 'Start listening to test your mic.'}>
@@ -55,6 +61,38 @@ export function VoicePage() {
         </div>
         {error && <Notice tone="bad">{error}</Notice>}
         <Toggle checked={s.showTyped} onChange={v => settings.set({ showTyped: v })} label="Show what I type in chat" hint="Typed messages appear in chat with your name and a mic badge." />
+      </Group>
+
+      <Group title="Speech recognition" note="What turns your voice into words. Chrome's is free but struggles with accents, names and game words. Whisper is much more accurate and costs very little.">
+        <Segmented value={s.sttEngine} onChange={v => settings.set({ sttEngine: v })} label="Speech recognition"
+          options={[{ value: 'browser', label: 'Chrome (free)' }, { value: 'whisper', label: 'Whisper (more accurate)' }]} />
+        {s.sttEngine === 'whisper' && (
+          <>
+            <div className="chips">
+              {STT_PRESETS.map(p => (
+                <button key={p.label} className={`chip ${s.sttUrl === p.url ? 'on' : ''}`} onClick={() => settings.set({ sttUrl: p.url, sttModel: p.model })}>{p.label}</button>
+              ))}
+            </div>
+            <div className="grid2">
+              <Field label="Key" hint={s.sttUrl.includes('groq') ? 'Free key from console.groq.com, under API Keys.' : s.sttUrl.includes('openai') ? 'From platform.openai.com, under API keys.' : 'From your provider.'}>
+                {id => (
+                  <div className="row">
+                    <input id={id} className="input" type={showKey ? 'text' : 'password'} autoComplete="off" spellCheck={false} value={s.sttKey}
+                      onChange={e => settings.set({ sttKey: e.target.value.trim() })} placeholder="Paste your key" />
+                    <button className="icon-btn" onClick={() => setShowKey(!showKey)} aria-label={showKey ? 'Hide key' : 'Show key'}>{showKey ? <EyeOff size={17} /> : <Eye size={17} />}</button>
+                  </div>
+                )}
+              </Field>
+              <Field label="Model">{id => <input id={id} className="input" value={s.sttModel} onChange={e => settings.set({ sttModel: e.target.value.trim() })} />}</Field>
+            </div>
+            <Field label="Address" hint="Any OpenAI-compatible transcription service works.">{id => <input id={id} className="input" value={s.sttUrl} onChange={e => settings.set({ sttUrl: e.target.value.trim() })} />}</Field>
+            {!s.sttKey && <Notice tone="info">Add a key, then press Start listening. Until then the mic won't turn on.</Notice>}
+          </>
+        )}
+        <Field label="Names and words chat should know" wide hint="Your mates, your pets, game words, anything that keeps getting misheard. Whisper uses this to spell them right, and chat uses it to work out what you meant.">
+          {id => <textarea id={id} className="input" rows={3} value={s.vocab} onChange={e => settings.set({ vocab: e.target.value.slice(0, 500) })}
+            placeholder="Warden, Nether, Ender Dragon, my mate Jordan, my cat Biscuit" />}
+        </Field>
       </Group>
 
       <Group title="Chat reads messages aloud" note="Each viewer gets their own voice. Wear headphones so your mic doesn't hear chat. The mic also ignores you while a voice is talking.">

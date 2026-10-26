@@ -51,7 +51,9 @@ export function buildPrompt(c: GenContext) {
 Streamer: ${streamer}
 Stream: ${s.topic.trim() || 'just chatting'}
 Chat vibe: ${vibe}
-Chat language: ${s.chatLanguage || 'English'}${s.about.trim() ? `
+Chat language: ${s.chatLanguage || 'English'}${s.vocab.trim() ? `
+
+Names and words the streamer uses a lot. Speech-to-text often mishears these, so when a word looks like a mishearing of one, read it as the real one: ${s.vocab.trim()}` : ''}${s.about.trim() ? `
 
 What the regulars already know about ${streamer}:
 ${s.about.trim()}` : ''}

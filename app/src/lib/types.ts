@@ -61,6 +61,11 @@ export interface Settings {
   micId: string;
   lang: string;
   pauseMs: number;         // how long a pause counts as you finishing a sentence
+  sttEngine: 'browser' | 'whisper';
+  sttUrl: string;
+  sttKey: string;
+  sttModel: string;
+  vocab: string;           // names and words recognition and chat should know
   showTyped: boolean;      // typed messages show in chat as you
   tts: boolean;
   ttsVol: number;
