@@ -12,7 +12,7 @@ function PopChat() {
   const state = useStore(feed, s => s);
   const bg = useStore(settings, s => s.popBg);
   useEffect(() => { if (win) win.document.body.style.background = bg; }, [bg]);
-  return <ChatView state={state} solid />;
+  return <ChatView state={state} solid keyColor={bg} />;
 }
 
 /** Opens the chat in its own window, for Window Capture + chroma key in OBS. */

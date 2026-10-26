@@ -12,19 +12,20 @@ import { cast } from '../../lib/viewers';
 import type { Msg } from '../../lib/types';
 import { ChatView } from '../../overlay/ChatView';
 import { openPopout } from '../popout';
-import { Notice, Slider, Status } from '../ui';
+import { BgPicker, Notice, Slider, Status } from '../ui';
 import type { PageProps } from '../App';
 
 export function LivePage({ go }: PageProps) {
   const state = useStore(feed, s => s);
   const [selected, setSelected] = useState<Msg | null>(null);
+  const popBg = useStore(settings, s => s.popBg);
   const [pop, setPop] = useState<{ tone: 'bad' | 'info'; text: ReactNode } | null>(null);
   const sayRef = useRef<HTMLInputElement>(null);
   const popOut = () => {
     const err = openPopout();
     setPop(err ? { tone: 'bad', text: err } : {
       tone: 'info',
-      text: <>The green is meant to disappear. In OBS, add a <b>Window Capture</b> of that window, then right click it, <b>Filters</b>, and add <b>Chroma Key</b>. Boxes are drawn solid there so they key cleanly. For see-through boxes, use <button className="link" onClick={() => go('obs')}>Connect to OBS</button> instead.</>,
+      text: <>The background colour is meant to disappear. Change it with the swatch next to Pop out. In OBS, add a <b>Window Capture</b> of that window, then right click it, <b>Filters</b>, and add <b>Chroma Key</b> set to the same colour. Boxes are drawn solid there so they key cleanly. For see-through boxes, use <button className="link" onClick={() => go('obs')}>Connect to OBS</button> instead.</>,
     });
   };
 
@@ -34,9 +35,12 @@ export function LivePage({ go }: PageProps) {
         <header className="stage-bar">
           <StatusRow go={go} />
           <div className="stage-tools">
-            <button className="btn ghost sm" onClick={popOut} title="Open the chat in its own window">
-              <ExternalLink size={15} /> Pop out
-            </button>
+            <div className="pop-group">
+              <BgPicker compact value={popBg} onChange={v => settings.set({ popBg: v })} />
+              <button className="btn ghost sm" onClick={popOut} title="Open the chat in its own window">
+                <ExternalLink size={15} /> Pop out
+              </button>
+            </div>
             <button className="btn ghost sm" onClick={clearChat} title="Clear the chat">
               <Eraser size={15} /> Clear
             </button>

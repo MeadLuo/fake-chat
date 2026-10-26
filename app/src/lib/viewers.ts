@@ -85,6 +85,7 @@ const VKEY = 'fc2-viewers';
 export const cast = createStore<{ list: Viewer[] }>({ list: storage.read<Viewer[]>(VKEY, []) });
 if (!cast.get().list.length) cast.set({ list: randomCast() });
 cast.subscribe(() => storage.write(VKEY, cast.get().list));
+storage.write(VKEY, cast.get().list); // keep a brand new cast, so it's the same people next time
 
 export const findViewer = (name: string) => cast.get().list.find(v => v.name === name);
 

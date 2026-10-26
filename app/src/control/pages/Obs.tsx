@@ -5,7 +5,7 @@ import { emit } from '../../lib/feed';
 import { settings } from '../../lib/settings';
 import { uid, useStore } from '../../lib/store';
 import { openPopout } from '../popout';
-import { Field, Group, Notice, Page, Select, Status, Toggle } from '../ui';
+import { BgPicker, Field, Group, Notice, Page, Status, Toggle } from '../ui';
 
 function siteUrl(view?: string) {
   const base = location.href.split('#')[0].split('?')[0];
@@ -73,11 +73,11 @@ export function ObsPage() {
       </Group>
 
       <Group title="No WebSocket? Use a window instead" note="Opens chat in its own window on a solid colour. Add it in OBS with Window Capture and a Chroma Key filter. See-through backgrounds don't work this way.">
+        <Field label="Background colour" wide hint="Set your Chroma Key filter in OBS to the same colour. Names in a similar colour switch to white or black so they never get keyed out.">
+          {() => <BgPicker value={s.popBg} onChange={v => settings.set({ popBg: v })} />}
+        </Field>
         <div className="row">
           <button className="btn" onClick={() => setPopErr(openPopout() || '')}><ExternalLink size={16} /> Open chat window</button>
-          <div style={{ width: 180 }}>
-            <Select value={s.popBg} onChange={v => settings.set({ popBg: v })} options={[{ value: '#00ff00', label: 'Green screen' }, { value: '#ff00ff', label: 'Pink screen' }, { value: '#000000', label: 'Black' }]} />
-          </div>
         </div>
         {popErr && <Notice tone="bad">{popErr}</Notice>}
       </Group>

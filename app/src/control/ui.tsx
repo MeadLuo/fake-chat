@@ -108,3 +108,33 @@ export function Status({ tone, children, title }: { tone: 'off' | 'good' | 'busy
 export function Notice({ tone = 'info', children, action }: { tone?: 'info' | 'bad' | 'good'; children: ReactNode; action?: ReactNode }) {
   return <div className={`notice notice-${tone}`}><div>{children}</div>{action}</div>;
 }
+
+export const KEY_PRESETS = [
+  { value: '#00ff00', label: 'Green' },
+  { value: '#0047ff', label: 'Blue' },
+  { value: '#ff00ff', label: 'Pink' },
+  { value: '#000000', label: 'Black' },
+  { value: '#ffffff', label: 'White' },
+];
+
+/** Background colour for the pop-out window: quick presets plus any colour. */
+export function BgPicker({ value, onChange, compact }: { value: string; onChange: (v: string) => void; compact?: boolean }) {
+  if (compact) {
+    return (
+      <label className="bg-swatch" title="Pop-out background colour">
+        <input type="color" value={value} onChange={e => onChange(e.target.value)} aria-label="Pop-out background colour" />
+        <span style={{ background: value }} />
+      </label>
+    );
+  }
+  return (
+    <div className="bg-picker">
+      {KEY_PRESETS.map(p => (
+        <button key={p.value} className={`bg-preset ${value.toLowerCase() === p.value ? 'on' : ''}`} onClick={() => onChange(p.value)} aria-pressed={value.toLowerCase() === p.value}>
+          <span style={{ background: p.value }} />{p.label}
+        </button>
+      ))}
+      <ColorInput value={value} onChange={onChange} />
+    </div>
+  );
+}

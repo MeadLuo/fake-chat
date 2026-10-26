@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { BADGES, EMOJI, FONTS, hexToRgba } from '../lib/themes';
 import type { Look, Msg, OverlayState, Poll } from '../lib/types';
 
@@ -81,8 +81,27 @@ export function lookVars(look: Look, solid = false): CSSProperties {
   } as CSSProperties;
 }
 
+const rgb = (hex: string) => { const n = parseInt((/^#?([0-9a-f]{6})$/i.exec(hex || '') || [, '000000'])[1]!, 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const near = (a: string, b: string) => { const x = rgb(a), y = rgb(b); return Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]) < 150; };
+
+/** For a chroma key window: anything coloured close to the key colour would vanish, so swap it for plain black or white. */
+function keySafe(state: OverlayState, key: string): OverlayState {
+  const [r, g, b] = rgb(key);
+  const plain = (r * 0.299 + g * 0.587 + b * 0.114) > 140 ? '#111111' : '#ffffff';
+  const fix = (c?: string) => (c && near(c, key) ? plain : c);
+  const look = state.look;
+  return {
+    ...state,
+    look: { ...look, textColor: fix(look.textColor)!, accent: fix(look.accent)!, bubbleColor: fix(look.bubbleColor)!, panelColor: fix(look.panelColor)! },
+    messages: state.messages.map(m => (m.color && near(m.color, key) ? { ...m, color: plain } : m)),
+  };
+}
+
 /** The chat as it appears on stream. */
-export function ChatView({ state, onMessageClick, className = '', solid = false }: { state: OverlayState; onMessageClick?: (m: Msg) => void; className?: string; solid?: boolean }) {
+export function ChatView({ state: raw, onMessageClick, className = '', solid = false, keyColor }: {
+  state: OverlayState; onMessageClick?: (m: Msg) => void; className?: string; solid?: boolean; keyColor?: string;
+}) {
+  const state = useMemo(() => (keyColor ? keySafe(raw, keyColor) : raw), [raw, keyColor]);
   const { look } = state;
   const [now, setNow] = useState(Date.now());
   const ticking = look.fade > 0 || (state.poll && !state.poll.done);
