@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Fake Chat</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%23FF5C8A'/%3E%3Cpath d='M9 11h14M9 16h10M9 21h7' stroke='%2316122A' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <script>
+    // Inside OBS (or with #overlay / ?overlay) this page is just the chat overlay
+    if (window.obsstudio || location.hash.startsWith('#overlay') || new URLSearchParams(location.search).has('overlay'))
+      document.documentElement.classList.add('overlay');
+  </script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.tsx"></script>
+</body>
+</html>

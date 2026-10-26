@@ -1,0 +1,189 @@
+@font-face {
+  font-family: "Monocraft";
+  font-weight: 400;
+  src: url("../assets/fonts/monocraft-regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Monocraft";
+  font-weight: 700;
+  src: url("../assets/fonts/monocraft-bold.woff2") format("woff2");
+}
+
+/* ---------- the chat as it appears on stream ---------- */
+.fc-root {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  overflow: hidden;
+  font-family: var(--fc-font);
+  font-size: var(--fc-size);
+  color: var(--fc-text);
+  background: var(--fc-panel);
+  border-radius: calc(var(--fc-radius) + 6px);
+  line-height: 1.35;
+}
+.fc-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: var(--fc-gap);
+  min-height: 0;
+  overflow: hidden;
+}
+.fc-fadetop .fc-list {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 38%);
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 38%);
+}
+.fc-pixel { -webkit-font-smoothing: none; }
+.fc-pixel .fc-msg { line-height: 1.3; }
+
+.fc-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5em;
+  flex-shrink: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  transition: opacity 0.6s, transform 0.6s;
+}
+.fc-right .fc-list { align-items: flex-end; }
+.fc-right .fc-msg { flex-direction: row-reverse; text-align: right; }
+.fc-content { min-width: 0; display: flex; flex-direction: column; gap: 0.1em; }
+.fc-bubbled .fc-msg:not(.fc-alert):not(.fc-system) {
+  background: var(--fc-bubble);
+  padding: 0.35em 0.65em;
+  border-radius: var(--fc-radius);
+  align-self: flex-start;
+}
+.fc-right.fc-bubbled .fc-msg { align-self: flex-end; }
+.fc-names-stacked.fc-bubbled .fc-msg:not(.fc-alert):not(.fc-system) { padding: 0.5em 0.75em; }
+
+.fc-outline-shadow .fc-msg { text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 4px rgba(0, 0, 0, 0.55); }
+.fc-outline-shadow.fc-pixel .fc-msg { text-shadow: 0.1em 0.1em 0 rgba(0, 0, 0, 0.8); }
+.fc-outline-outline .fc-msg {
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0 2px 3px rgba(0, 0, 0, 0.6);
+}
+.fc-bubbled.fc-outline-shadow .fc-msg:not(.fc-alert) { text-shadow: none; }
+.fc-outline-glow .fc-msg { text-shadow: 0 0 6px rgba(0, 0, 0, 0.6); }
+.fc-outline-glow .fc-name { text-shadow: 0 0 10px currentColor, 0 0 2px currentColor; }
+.fc-outline-glow .fc-alert { box-shadow: 0 0 22px var(--fc-accent); }
+
+.fc-name { font-weight: 700; }
+.fc-pixel .fc-name { font-weight: 400; }
+.fc-badge { margin-right: 0.25em; font-size: 0.85em; }
+.fc-head { display: flex; align-items: center; font-size: 0.82em; }
+.fc-at { font-weight: 700; }
+.fc-avatar {
+  flex-shrink: 0;
+  width: 1.7em;
+  height: 1.7em;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.8em;
+  font-weight: 800;
+  color: #16122a;
+  text-shadow: none;
+  margin-top: 0.05em;
+}
+.fc-names-stacked .fc-avatar { width: 2.1em; height: 2.1em; }
+
+.fc-hl { box-shadow: inset 3px 0 0 var(--fc-accent); padding-left: 0.6em; }
+.fc-bubbled .fc-hl { box-shadow: inset 3px 0 0 var(--fc-accent); }
+.fc-me .fc-name { color: var(--fc-accent) !important; }
+.fc-me { box-shadow: inset 3px 0 0 var(--fc-accent); padding-left: 0.6em; }
+
+.fc-alert {
+  align-self: flex-start;
+  background: var(--fc-accent);
+  color: #fff;
+  font-weight: 800;
+  padding: 0.45em 0.8em;
+  border-radius: var(--fc-radius);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+.fc-system { font-size: 0.8em; opacity: 0.75; font-style: italic; }
+.fc-pixel .fc-system { font-style: normal; }
+
+.fc-leaving { opacity: 0; transform: translateY(-6px); }
+
+/* entrances */
+.fc-anim-slide .fc-msg { animation: fc-slide 0.32s cubic-bezier(.2,.9,.3,1.2) both; }
+.fc-anim-pop .fc-msg { animation: fc-pop 0.34s cubic-bezier(.2,.9,.3,1.4) both; transform-origin: left bottom; }
+.fc-anim-fade .fc-msg { animation: fc-fade 0.45s ease-out both; }
+@keyframes fc-slide { from { opacity: 0; transform: translateY(10px); } }
+@keyframes fc-pop { from { opacity: 0; transform: scale(0.85); } }
+@keyframes fc-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .fc-msg { animation: none !important; }
+}
+
+/* poll */
+.fc-poll {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+  padding: 0.7em 0.8em;
+  border-radius: calc(var(--fc-radius) + 2px);
+  background: rgba(16, 12, 32, 0.82);
+  border: 2px solid var(--fc-accent);
+  font-size: 0.85em;
+  text-shadow: none;
+  color: #fff;
+  animation: fc-pop 0.35s both;
+}
+.fc-poll-q { font-weight: 800; margin-bottom: 0.5em; }
+.fc-poll-opt {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6em;
+  padding: 0.3em 0.55em;
+  margin-top: 0.3em;
+  border-radius: calc(var(--fc-radius) / 1.5);
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+.fc-poll-bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--fc-accent-soft);
+  transition: width 0.6s cubic-bezier(.2,.8,.2,1);
+}
+.fc-win .fc-poll-bar { background: var(--fc-accent); opacity: 0.55; }
+.fc-poll-label, .fc-poll-pct { position: relative; }
+.fc-poll-pct { font-weight: 700; font-variant-numeric: tabular-nums; }
+.fc-poll-foot { margin-top: 0.5em; font-size: 0.8em; opacity: 0.7; }
+
+/* viewer count widget */
+.fc-count {
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.35em 0.8em;
+  border-radius: 999px;
+  background: rgba(16, 12, 32, 0.8);
+  color: #fff;
+  font-family: var(--fc-font);
+  font-size: var(--fc-size);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.fc-live-dot {
+  width: 0.55em;
+  height: 0.55em;
+  border-radius: 50%;
+  background: #ff3b5c;
+  box-shadow: 0 0 0 0 rgba(255, 59, 92, 0.6);
+  animation: fc-live 1.8s infinite;
+}
+@keyframes fc-live { 70% { box-shadow: 0 0 0 0.45em rgba(255, 59, 92, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 59, 92, 0); } }
+
+.fc-clickable { cursor: pointer; border-radius: var(--fc-radius); }
+.fc-clickable:hover { outline: 2px solid rgba(255, 255, 255, 0.35); outline-offset: 2px; }
+.fc-clickable:focus-visible { outline: 2px solid var(--fc-accent); outline-offset: 2px; }
