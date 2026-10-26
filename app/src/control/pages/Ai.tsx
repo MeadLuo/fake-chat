@@ -4,6 +4,7 @@ import { generateChat, usage } from '../../engine/ai';
 import { BRAINS, VIBES, aiReady, modelName, settings } from '../../lib/settings';
 import { useStore } from '../../lib/store';
 import type { Brain, Provider } from '../../lib/types';
+import { GAME_PACKS, activePacks } from '../../lib/games';
 import { Field, Group, Notice, Page, Segmented, Select, Slider, Toggle } from '../ui';
 
 const PRESETS = [
@@ -19,6 +20,7 @@ export function AiPage() {
   const [show, setShow] = useState(false);
   const [test, setTest] = useState<{ tone: 'good' | 'bad' | 'info'; text: string } | null>(null);
   const set = settings.set;
+  const packs = activePacks(s);
 
   const runTest = async () => {
     setTest({ tone: 'info', text: 'Asking the AI...' });
@@ -43,6 +45,29 @@ export function AiPage() {
             {id => <input id={id} className="input" value={s.topic} onChange={e => set({ topic: e.target.value })} placeholder="Minecraft hardcore, day 12" />}
           </Field>
         </div>
+      </Group>
+
+      <Group title="Game knowledge" note="Chat knows these games inside out: every character, weapon, ability and the slang players use. Whisper also uses the names to spell them right.">
+        <div className="chips" role="group" aria-label="Games chat knows">
+          {GAME_PACKS.map(p => {
+            const on = s.gamePacks.includes(p.id);
+            const auto = !on && s.gamesAuto && p.match.test(s.topic);
+            return (
+              <button key={p.id} className={`chip ${on || auto ? 'on' : ''}`} aria-pressed={on || auto}
+                title={auto ? "On because of what you're playing" : undefined}
+                onClick={() => set({ gamePacks: on ? s.gamePacks.filter(x => x !== p.id) : [...s.gamePacks, p.id] })}>
+                {p.name}{auto ? ' (auto)' : ''}
+              </button>
+            );
+          })}
+        </div>
+        <Toggle checked={s.gamesAuto} onChange={v => set({ gamesAuto: v })} label="Pick from what I'm playing"
+          hint={'Put the game in "What you\'re playing" above and chat loads the right one.'} />
+        <p className="hint">{packs.length ? `Chat knows: ${packs.map(p => p.name).join(' and ')}.` : 'No game loaded right now.'}</p>
+        <Field label="Teach chat anything else" wide hint="Another game, your server, your team, inside jokes. A few lines is plenty.">
+          {id => <textarea id={id} className="input" rows={4} value={s.customKnowledge} onChange={e => set({ customKnowledge: e.target.value.slice(0, 3000) })}
+            placeholder="We play on a private Minecraft server called Sunset SMP. Jordan always dies first. Our base is the big tree." />}
+        </Field>
       </Group>
 
       <Group title="AI">

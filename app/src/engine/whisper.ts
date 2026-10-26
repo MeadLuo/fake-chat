@@ -1,3 +1,4 @@
+import { activePacks } from '../lib/games';
 import { settings } from '../lib/settings';
 
 // Speech to text with Whisper (Groq or OpenAI). Much better than Chrome's
@@ -119,7 +120,15 @@ export function createWhisper(h: WhisperHandlers) {
     form.append('model', s.sttModel || 'whisper-large-v3-turbo');
     const lang = (s.lang || navigator.language || 'en').split('-')[0];
     if (lang) form.append('language', lang);
-    const hint = [s.streamer && `Streamer: ${s.streamer}.`, s.topic && `Playing ${s.topic}.`, s.vocab && `Words: ${s.vocab}`].filter(Boolean).join(' ').slice(0, 600);
+    // keep it short: Whisper only reads about 224 tokens of hint
+    // take names from each game in turn, so every game gets a fair share of the space
+    const lists = activePacks(s).map(p => p.words);
+    const mixed: string[] = [];
+    for (let i = 0; i < Math.max(0, ...lists.map(l => l.length)); i++) lists.forEach(l => { if (l[i]) mixed.push(l[i]); });
+    const gameWords = mixed.join(', ');
+    const full = [s.streamer && `Streamer: ${s.streamer}.`, s.topic && `Playing ${s.topic}.`, s.vocab && `Words: ${s.vocab}.`, gameWords && `Names: ${gameWords}`]
+      .filter(Boolean).join(' ');
+    const hint = full.length > 720 ? full.slice(0, 720).replace(/,[^,]*$/, '') : full;
     if (hint) form.append('prompt', hint);
     form.append('temperature', '0');
     form.append('response_format', 'json');

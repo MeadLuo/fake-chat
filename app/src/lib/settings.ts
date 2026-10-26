@@ -24,6 +24,7 @@ export const DEFAULT_SETTINGS: Settings = {
   busy: 3, replyLength: 'mixed', emoteLevel: 1, typos: 1, chatLanguage: 'English', swearing: false,
   idle: true, reactToScreen: true, screenSensitivity: 2,
   alerts: true, alertMinutes: 4, viewerCount: 42, newViewers: false, learn: true,
+  gamePacks: [], gamesAuto: true, customKnowledge: '',
   provider: 'none', apiKey: '', brain: 'smart', model: '', baseUrl: '',
   micId: '', lang: '', pauseMs: 1100, showTyped: true,
   sttEngine: 'browser', sttUrl: 'https://api.groq.com/openai/v1', sttKey: '', sttModel: 'whisper-large-v3-turbo', vocab: '',

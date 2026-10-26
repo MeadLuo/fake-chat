@@ -51,6 +51,9 @@ export interface Settings {
   viewerCount: number;     // shown on the viewer count widget
   newViewers: boolean;
   learn: boolean;
+  gamePacks: string[];     // game knowledge picked by hand
+  gamesAuto: boolean;      // also pick it from what you're playing
+  customKnowledge: string; // anything else chat should know
   // ai
   provider: Provider;
   apiKey: string;

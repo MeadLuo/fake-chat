@@ -2,6 +2,7 @@ import { createStore } from '../lib/store';
 import { BRAINS, VIBES, modelName, settings } from '../lib/settings';
 import { ACTIVITY, cast, memory } from '../lib/viewers';
 import type { Poll } from '../lib/types';
+import { activePacks } from '../lib/games';
 
 export type GenKind = 'speech' | 'idle' | 'screen' | 'event';
 
@@ -42,6 +43,11 @@ export function buildPrompt(c: GenContext) {
   const s = settings.get();
   const streamer = s.streamer.trim() || 'the streamer';
   const vibe = s.vibe === 'custom' ? (s.customVibe.trim() || VIBES.hype.prompt) : (VIBES[s.vibe]?.prompt || VIBES.hype.prompt);
+  const packs = activePacks(s);
+  const knowledge = [
+    ...packs.map(p => p.knowledge),
+    s.customKnowledge.trim() && `Other things chat knows:\n${s.customKnowledge.trim()}`,
+  ].filter(Boolean).join('\n\n');
   const castLines = cast.get().list.slice(0, 70).map(v =>
     `- ${v.name}${v.badge ? ` [${v.badge}]` : ''} (${ACTIVITY[v.chat] || 'normal'}): ${v.note || 'regular viewer'}`).join('\n');
 
@@ -58,7 +64,10 @@ Names and words the streamer uses a lot. Speech-to-text often mishears these, so
 What the regulars already know about ${streamer}:
 ${s.about.trim()}` : ''}
 
-The viewers (name [badge] (how much they talk): personality):
+${knowledge ? `Game knowledge. Chat watches this game a lot and knows it well. Use the right names for characters, abilities, weapons, maps and modes, and real player slang. Knowledgeable viewers are accurate. Keep it casual, never lecture or list facts. If speech-to-text mangles a character name, read it as the closest real one.
+${knowledge}
+
+` : ''}The viewers (name [badge] (how much they talk): personality):
 ${castLines}
 
 Be a smart, real chat, not a generic one:
